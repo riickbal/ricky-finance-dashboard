@@ -933,6 +933,105 @@ function deleteTransaction(id) {
   S.transactions=S.transactions.filter(t=>t.id!==id);
   saveState(); populateFilters(); renderAll(); toast('Dihapus');
 }
+
 function clearForm() {
   document.getElementById('d-amount').value='';
-  document.getElementById('d-desc
+  document.getElementById('d-desc').value='';
+}
+
+function saveBankBalances() {
+  S.banks.forEach((b,i)=>{
+    const val=parseFloat(document.getElementById('bbal-'+i).value);
+    if(!isNaN(val)) b.balance=val;
+    b.updated=new Date().toISOString().split('T')[0];
+  });
+  saveState(); renderAll(); toast('Saldo bank tersimpan!');
+}
+
+function saveCCBalances() {
+  S.creditCards.forEach((cc,i)=>{
+    const val=parseFloat(document.getElementById('ccbal-'+i).value);
+    if(!isNaN(val)) cc.outstanding=val;
+  });
+  saveState(); renderAll(); toast('CC outstanding tersimpan!');
+}
+
+function saveInvestmentPrices() {
+  const fxVal=parseFloat(document.getElementById('d-fxrate').value);
+  if(!isNaN(fxVal)&&fxVal>0) S.fxRate=fxVal;
+  const hasData=inv=>inv.ticker||inv.costBasis>0;
+  S.investments.filter(hasData).forEach((inv,i)=>{
+    const val=parseFloat(document.getElementById('invp-'+i).value);
+    if(!isNaN(val)) inv.currentPrice=val;
+  });
+  saveState(); renderAll(); toast('Harga investasi tersimpan!');
+}
+
+function saveIncome() {
+  const sal=parseFloat(document.getElementById('d-salary').value);
+  const kpr=parseFloat(document.getElementById('d-kpr').value);
+  if(!isNaN(sal)) S.income.salary=sal;
+  if(!isNaN(kpr)) S.income.kprMonthly=kpr;
+  saveState(); renderAll(); toast('Income tersimpan!');
+}
+
+function saveBudgets() {
+  Object.keys(S.budgets).forEach(cat=>{
+    const el=document.getElementById('budg-'+cat.replace(/[^a-z0-9]/gi,'_'));
+    if(el){ const val=parseFloat(el.value); if(!isNaN(val)) S.budgets[cat]=val; }
+  });
+  saveState(); renderBudget(); toast('Budget tersimpan!');
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderDashboard();
+  renderAssets();
+  renderLiabilities();
+  renderInvestments();
+  renderTransactions();
+  renderBudget();
+  renderDispatch();
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  el.classList.add('active');
+  if(page==='expenses') renderTransactions();
+  if(page==='investments') renderInvestments();
+}
+
+function showInner(page, panel, el) {
+  document.querySelectorAll('#page-'+page+' .inner-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#page-'+page+' .inner-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(page+'-'+panel).classList.add('active');
+  el.classList.add('active');
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function toast(msg, type='green') {
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=type==='red'?'var(--red)':'var(--green)';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadState();
+populateFilters();
+renderAll();
+</script>
+</body>
+</html>
