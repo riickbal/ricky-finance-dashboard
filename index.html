@@ -1299,4 +1299,18 @@ function updatePrices() {
         if (inv.ticker && p[inv.ticker]) { inv.currentPrice = p[inv.ticker]; delete inv.nbvOverride; }
       });
       saveState(); renderAll();
-    
+        })
+    .catch(() => {});
+}
+
+// Load data.js dengan cache buster — always fresh, no stale cache
+(function() {
+  const s = document.createElement('script');
+  s.src = 'data.js?t=' + Date.now();
+  s.onload = initDashboard;
+  s.onerror = initDashboard;
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
