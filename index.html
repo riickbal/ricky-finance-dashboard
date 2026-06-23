@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ricky Finance Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #22263a;
+    --border: #2e3350;
+    --accent: #4f7cff;
+    --accent2: #7c5cff;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --card: #1e2235;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  .topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
+  .logo { font-weight: 700; font-size: 15px; color: var(--accent); padding: 16px 0; margin-right: 32px; white-space: nowrap; }
+  .logo span { color: var(--text); }
+  .nav-tabs { display: flex; gap: 0; }
+  .nav-tab { padding: 16px 18px; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: all .15s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .topbar-right { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .card-value { font-size: 24px; font-weight: 700; }
+  .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-21 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e2235; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .tr-total td { font-weight: 700; background: rgba(79,124,255,.06); border-top: 1px solid var(--border); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-blue { background: rgba(79,124,255,.15); color: var(--accent); }
+  .badge-gray { background: rgba(100,116,139,.15); color: var(--muted); }
+
+  .progress-wrap { background: var(--bg3); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 6px; }
+  .progress-bar { height: 100%; border-radius: 4px; transition: width .3s; }
+  .bar-green { background: var(--green); }
+  .bar-yellow { background: var(--yellow); }
+  .bar-red { background: var(--red); }
+  .bar-blue { background: var(--accent); }
+
+  .alert { border-radius: 8px; padding: 10px 14px; font-size: 12px; margin-bottom: 8px; display: flex; gap: 8px; align-items: flex-start; }
+  .alert-red { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+  .alert-yellow { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: #fcd34d; }
+  .alert-green { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .neu { color: var(--muted); }
+
+  .dispatch-form { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .dispatch-form h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .dispatch-form p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  input, select, textarea { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 13px; width: 100%; outline: none; transition: border-color .15s; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--bg2); }
+  textarea { resize: vertical; min-height: 60px; }
+
+  .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3d6ae8; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text); }
+  .btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .btn-danger:hover { background: rgba(239,68,68,.25); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+
+  .inner-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .inner-tab { padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); border: 1px solid var(--border); transition: all .15s; }
+  .inner-tab:hover { color: var(--text); }
+  .inner-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .inner-panel { display: none; }
+  .inner-panel.active { display: block; }
+
+  .nw-card { background: linear-gradient(135deg, #1e2235, #22263a); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .nw-card::before { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(79,124,255,.15), transparent); }
+  .nw-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .nw-value { font-size: 38px; font-weight: 800; letter-spacing: -.02em; }
+  .nw-meta { display: flex; gap: 32px; margin-top: 20px; flex-wrap: wrap; }
+  .nw-meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .nw-meta-label { font-size: 11px; color: var(--muted); }
+  .nw-meta-value { font-size: 16px; font-weight: 700; }
+
+  .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-name { font-size: 13px; }
+  .metric-value { font-size: 13px; font-weight: 600; }
+
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .table-wrap { overflow-x: auto; }
+
+  .budget-row { margin-bottom: 16px; }
+  .budget-row-head { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; }
+
+  .del-btn { opacity: 0; transition: opacity .15s; }
+  tr:hover .del-btn { opacity: 1; }
+
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    .grid-21 { grid-template-columns: 1fr; }
+    .nw-value { font-size: 26px; }
+    .top-highlights { grid-template-columns: 1fr !important; }
+  }
+  @media (max-width: 600px) {
+    .grid-4, .grid-3, .grid-2, .grid-21 { grid-template-columns: 1fr; }
+    .page { padding: 16px; }
+    .topbar { padding: 0 16px; }
+    .nav-tab { padding: 14px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">💰 RICKY<span>'s CFO</span></div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</div>
+    <div class="nav-tab" onclick="showPage('dispatch',this)">📥 Dispatch</div>
+    <div class="nav-tab" onclick="showPage('expenses',this)">Expenses</div>
+    <div class="nav-tab" onclick="showPage('assets',this)">Assets</div>
+    <div class="nav-tab" onclick="showPage('liabilities',this)">Liabilities</div>
+    <div class="nav-tab" onclick="showPage('investments',this)">Investments</div>
+  </div>
+  <div class="topbar-right" id="lastUpdated">—</div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div id="alerts-container"></div>
+  <div class="top-highlights" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+    <div class="nw-card" style="margin-bottom:0">
+      <div class="nw-label">Net Worth</div>
+      <div class="nw-value" id="nw-total">—</div>
+      <div class="card-sub" style="margin-top:6px">Total Assets − Total Liabilities</div>
+      <div class="nw-meta">
+        <div class="nw-meta-item"><div class="nw-meta-label">Total Assets</div><div class="nw-meta-value pos" id="nw-assets">—</div></div>
+        <div class="nw-meta-item"><div class="nw-meta-label">Total Liabilities</div><div class="nw-meta-value neg" id="nw-liabilities">—</div></div>
+        <div class="nw-meta-item"><div class="nw-meta-label">Investment Portfolio</div><div class="nw-meta-value" id="nw-invest">—</div></div>
+      </div>
+    </div>
+    <div class="nw-card" style="margin-bottom:0;background:linear-gradient(135deg,#1a2535,#1e3040)">
+      <div class="nw-label">💵 Cash Balance</div>
+      <div class="nw-value" id="nw-cash">—</div>
+      <div class="card-sub" style="margin-top:6px">Total semua rekening bank</div>
+      <div class="nw-meta" id="nw-cash-banks"></div>
+    </div>
+  </div>
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Cash Flow (Bulan Ini)</div>
+      <div class="card-value" id="kpi-cashflow">—</div>
+      <div class="card-sub" id="kpi-cashflow-sub">Income − Expenses</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Debt-to-Income (DTI)</div>
+      <div class="card-value" id="kpi-dti">—</div>
+      <div class="card-sub" id="kpi-dti-sub">Cicilan ÷ Net Income · batas &lt;30%</div>
+      <div class="progress-wrap"><div class="progress-bar" id="dti-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">CC Utilization</div>
+      <div class="card-value" id="kpi-cc-util">—</div>
+      <div class="card-sub" id="kpi-cc-sub">Outstanding ÷ Limit · batas &lt;70%</div>
+      <div class="progress-wrap"><div class="progress-bar" id="cc-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Savings Rate</div>
+      <div class="card-value" id="kpi-savings">—</div>
+      <div class="card-sub">Set salary di Dispatch untuk kalkulasi</div>
+      <div class="progress-wrap"><div class="progress-bar bar-green" id="savings-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="grid-21">
+    <div class="card">
+      <div class="card-title">Asset Allocation</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Category</th><th>Value (IDR)</th><th>% Assets</th></tr></thead>
+        <tbody id="asset-alloc-table"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cash per Bank</div>
+      <div id="cash-bank-list"></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Top Expenses — Bulan Ini</div>
+      <div id="expense-snapshot" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Liabilities Breakdown</div>
+      <div id="liabilities-snapshot" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DISPATCH -->
+<div class="page" id="page-dispatch">
+
+  <!-- PANDUAN -->
+  <div style="background:rgba(79,124,255,.08);border:1px solid rgba(79,124,255,.25);border-radius:12px;padding:20px;margin-bottom:24px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📋 Cara Pakai Dispatch</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;font-size:13px">
+      <div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">1️⃣ Ada mutasi baru?</div>
+        <div style="color:var(--muted);line-height:1.6">Isi form <b style="color:var(--text)">Tambah Transaksi</b> di bawah.<br>
+        • <b style="color:var(--text)">Tipe Out</b> = lo ngeluarin duit (belanja, bensin, makan, bayar cicilan)<br>
+        • <b style="color:var(--text)">Tipe In</b> = duit masuk (gaji, transfer masuk)<br>
+        • <b style="color:var(--text)">Transfer</b> = pindah antar rekening sendiri<br>
+        Klik <b style="color:var(--green)">+ Tambah</b> → dashboard langsung update.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">2️⃣ Saldo bank berubah?</div>
+        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update Saldo Bank</b>.<br>
+        Copy angka saldo terbaru dari m-BCA / Livin / screenshot → paste ke kolom rekening yang sesuai → <b style="color:var(--green)">Simpan Saldo</b>.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">3️⃣ Ada tagihan CC baru?</div>
+        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update CC Outstanding</b>.<br>
+        Isi outstanding terbaru dari aplikasi bank → <b style="color:var(--green)">Simpan CC</b>.<br>
+        Dashboard otomatis recalculate utilization %.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">4️⃣ Update investasi?</div>
+        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update Harga Investasi</b>.<br>
+        Isi harga terkini VOO (USD) / BBRI (IDR) / crypto → update juga <b style="color:var(--text)">FX Rate</b> → <b style="color:var(--green)">Simpan Harga</b>.<br>
+        P&L & NBV langsung ke-recalc.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">5️⃣ Pertama kali setup?</div>
+        <div style="color:var(--muted);line-height:1.6">Scroll paling bawah ke <b style="color:var(--text)">Set Income Bulanan</b>.<br>
+        Isi <b style="color:var(--text)">take-home salary</b> + <b style="color:var(--text)">cicilan KPR</b> → <b style="color:var(--green)">Simpan</b>.<br>
+        Ini kunci biar DTI & Savings Rate bisa ke-kalkulasi.</div>
+      </div>
+      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px">
+        <div style="font-weight:700;color:var(--yellow);margin-bottom:6px">⚡ Tips Kategori</div>
+        <div style="color:var(--muted);font-size:12px;line-height:1.7">
+          <b style="color:var(--text)">Bayar CC</b> → Pembayaran Utang/Cicilan<br>
+          <b style="color:var(--text)">Top-up e-wallet / Flazz</b> → Transportation<br>
+          <b style="color:var(--text)">GoFood / GoPay Later</b> → Meals<br>
+          <b style="color:var(--text)">Transfer ke rekening sendiri</b> → Transfer Internal<br>
+          <b style="color:var(--text)">Tidak jelas</b> → Lain-lain / Belum Jelas
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dispatch-form">
+    <h2>📥 Tambah Transaksi</h2>
+    <p>Isi satu per satu dari mutasi lo. Klik tombol hijau buat simpan.</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Tanggal</label><input type="date" id="d-date"></div>
+      <div class="form-group"><label>Tipe</label>
+        <select id="d-type">
+          <option value="Out">Out (Pengeluaran)</option>
+          <option value="In">In (Pemasukan)</option>
+          <option value="Transfer">Transfer Internal</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Kategori</label>
+        <select id="d-category">
+          <option>Income - Salary</option><option>Income - Other</option>
+          <option>Daughter Needs</option><option>Utilities &amp; Household</option>
+          <option>Transportation</option><option>Service Vehicle</option>
+          <option>Meals</option><option>Phone Credit</option>
+          <option>Subscription</option><option>Wellness (Hobbies &amp; Travel)</option>
+          <option>Shopping/Belanja Online</option><option>Pembayaran Utang/Cicilan</option>
+          <option>Biaya Admin/Fee</option><option>Transfer Internal</option>
+          <option>Lain-lain / Belum Jelas</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Account / Metode</label>
+        <select id="d-account">
+          <option>BCA 002 (blu)</option><option>BCA 730</option><option>BCA 245</option>
+          <option>Permata 412 (Payroll)</option><option>CIMB 707</option>
+          <option>CIMB Credit Card (MC Plat Syariah)</option><option>Permata Cashback Card</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Amount (IDR)</label><input type="number" id="d-amount" placeholder="50000" min="0"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px"><label>Deskripsi</label>
+      <textarea id="d-desc" placeholder="Merchant, detail, receipt path..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="addTransaction()">+ Tambah Transaksi</button>
+      <button class="btn btn-ghost" onclick="clearForm()">Reset</button>
+    </div>
+  </div>
+
+  <div class="dispatch-form">
+    <h2>🏦 Update Saldo Bank</h2>
+    <p>Sesuaikan dengan saldo aktual dari mutasi/screenshot.</p>
+    <div class="form-grid" id="bank-balance-inputs"></div>
+    <button class="btn btn-primary" onclick="saveBankBalances()">Simpan Saldo</button>
+  </div>
+
+  <div class="dispatch-form">
+    <h2>💳 Update CC Outstanding</h2>
+    <div class="form-grid" id="cc-balance-inputs"></div>
+    <button class="btn btn-primary" onclick="saveCCBalances()">Simpan CC</button>
+  </div>
+
+  <div class="dispatch-form">
+    <h2>📈 Update Harga Investasi</h2>
+    <p>Isi current price → NBV &amp; P&amp;L otomatis recalculate.</p>
+    <div id="invest-price-inputs"></div>
+    <div class="form-group" style="max-width:220px;margin-top:12px;margin-bottom:16px">
+      <label>FX Rate USD/IDR</label>
+      <input type="number" id="d-fxrate" placeholder="17819">
+    </div>
+    <button class="btn btn-primary" onclick="saveInvestmentPrices()">Simpan Harga</button>
+  </div>
+
+  <div class="dispatch-form" style="margin-bottom:0">
+    <h2>💰 Set Income Bulanan</h2>
+    <p>Dipakai untuk kalkulasi DTI &amp; Savings Rate.</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Net Salary / Take-home Pay (IDR/bln)</label><input type="number" id="d-salary" placeholder="0"></div>
+      <div class="form-group"><label>KPR Cicilan Bulanan (IDR)</label><input type="number" id="d-kpr" placeholder="0"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveIncome()">Simpan Income</button>
+  </div>
+</div>
+
+<!-- EXPENSES -->
+<div class="page" id="page-expenses">
+  <div class="inner-tabs">
+    <div class="inner-tab active" onclick="showInner('expenses','log',this)">Transaction Log</div>
+    <div class="inner-tab" onclick="showInner('expenses','budget',this)">Budget vs Actual</div>
+  </div>
+  <div class="inner-panel active" id="expenses-log">
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <select id="filter-month" onchange="renderTransactions()" style="max-width:160px"></select>
+      <select id="filter-type" onchange="renderTransactions()" style="max-width:140px">
+        <option value="">Semua Tipe</option><option value="In">In</option>
+        <option value="Out">Out</option><option value="Transfer">Transfer</option>
+      </select>
+      <select id="filter-cat" onchange="renderTransactions()" style="max-width:200px"></select>
+      <div style="margin-left:auto;font-size:13px;color:var(--muted)" id="trx-count"></div>
+    </div>
+    <div class="card table-wrap">
+      <table><thead><tr>
+        <th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Account</th>
+        <th style="text-align:right">Amount</th><th>Deskripsi</th><th></th>
+      </tr></thead><tbody id="trx-table-body"></tbody></table>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap" id="trx-summary-row"></div>
+  </div>
+  <div class="inner-panel" id="expenses-budget">
+    <div class="grid-3" id="budget-kpi-row"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Expense per Kategori — Budget vs Actual (Bulan Ini)</div>
+      <div style="margin-top:16px" id="budget-bars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Edit Budget Bulanan</div>
+      <div id="budget-edit-form" style="margin-top:12px"></div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="saveBudgets()">Simpan Budget</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSETS -->
+<div class="page" id="page-assets">
+  <div class="grid-3" id="assets-kpi"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Bank Accounts</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Bank</th><th>Nickname</th><th>Tipe</th><th style="text-align:right">Balance</th><th>Updated</th></tr></thead>
+        <tbody id="bank-table"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Asset Summary</div>
+      <div id="asset-summary-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LIABILITIES -->
+<div class="page" id="page-liabilities">
+  <div class="grid-3" id="liab-kpi"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Credit Cards</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Kartu</th><th>Limit</th><th>Outstanding</th><th>Available</th><th>Utilization</th></tr></thead>
+        <tbody id="cc-table"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Loans (KPR &amp; KTA)</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Tipe</th><th>Lender</th><th>Sisa Pokok</th><th>Cicilan/bln</th><th>Tenor</th></tr></thead>
+        <tbody id="loan-table"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">⚠️ Flags &amp; Alerts</div><div id="liab-alerts" style="margin-top:8px"></div></div>
+</div>
+
+<!-- INVESTMENTS -->
+<div class="page" id="page-investments">
+  <div class="grid-4" id="invest-kpi"></div>
+  <div class="card">
+    <div class="card-title">Portfolio Detail</div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Platform</th><th>Asset</th><th>Tipe</th><th>Qty</th>
+        <th style="text-align:right">Cost Basis</th><th style="text-align:right">Curr. Price</th>
+        <th style="text-align:right">NBV (IDR)</th><th style="text-align:right">P&amp;L (IDR)</th>
+        <th style="text-align:right">P&amp;L %</th><th style="text-align:right">% Port.</th>
+      </tr></thead>
+      <tbody id="invest-table"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// DEFAULT STATE (seeded from Excel)
+// ============================================================
+const DEFAULT_STATE = {
+  fxRate: 17819,
+  lastUpdated: '2026-06-23',
+  banks: [
+    { name:'BCA', nick:'blu by BCA', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
+    { name:'BCA', nick:'m-Info Acct 1 (730)', type:'Tabungan', balance:74454.14, updated:'2026-06-22', acct:'****5062' },
+    { name:'BCA', nick:'m-Info Acct 2 (245)', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
+    { name:'Permata', nick:'Payroll Account', type:'Payroll/Giro', balance:16000000.52, updated:'2026-06-21', acct:'****4829' },
+    { name:'CIMB Niaga', nick:'Auto-debit KTA', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'707165742xx' }
+  ],
+  creditCards: [
+    { name:'CC CIMB', issuer:'CIMB Niaga Syariah', limit:59200000, outstanding:20205890.33, dueDate:'', notes:'Rp3,098,486 PENDING REFUND (raket padel Tokopedia dibatalkan). Available limit belum dipulihkan.' },
+    { name:'CC Permata', issuer:'Permata', limit:10000000, outstanding:9760447, dueDate:'', notes:'Acct ****9447' }
+  ],
+  loans: [
+    { type:'KPR', lender:'Permata', remaining:1128658676, monthly:0, rate:0, tenor:0 },
+    { type:'KTA', lender:'CIMB Niaga (Xtra Dana)', remaining:47962217.23, monthly:2637444, rate:0, tenor:0 }
+  ],
+  investments: [
+    { platform:'Binance', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'USD', costBasis:0, currentPrice:0 },
+    { platform:'Binance', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'USD', costBasis:0, currentPrice:0 },
+    { platform:'Indodax', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'IDR', costBasis:0, currentPrice:0 },
+    { platform:'Pluang', ticker:'VOO', type:'ETF (US Stock)', qty:0, avgBuy:0, currency:'USD', costBasis:5000000, currentPrice:0, nbvOverride:4925203, lastUpdate:'2026-06-20' },
+    { platform:'Stockbit', ticker:'BBRI', type:'Saham IDX', qty:0, avgBuy:0, currency:'IDR', costBasis:10000000, currentPrice:0, nbvOverride:9376000, lastUpdate:'2026-06-20' }
+  ],
+  transactions: [
+    {id:'t1',date:'2026-06-20',type:'Transfer',category:'Transfer Internal',account:'Permata -> BCA 730',amount:500000,desc:'Transfer internal Permata ke BCA 7305025062'},
+    {id:'t2',date:'2026-06-20',type:'Out',category:'Transportation',account:'CIMB Credit Card (MC Plat Syariah)',amount:272200,desc:'SPBU 34.158.04 KSO Curug, Tangerang'},
+    {id:'t3',date:'2026-06-20',type:'Out',category:'Wellness (Hobbies & Travel)',account:'BCA 730',amount:10000,desc:'QR payment - Padel Geh'},
+    {id:'t4',date:'2026-06-20',type:'In',category:'Income - Other',account:'BCA 730',amount:70000,desc:'Transfer masuk dari Lia Uzliawati SE'},
+    {id:'t5',date:'2026-06-20',type:'Out',category:'Lain-lain / Belum Jelas',account:'BCA 730',amount:10000,desc:'QR payment - VM Yanmar'},
+    {id:'t6',date:'2026-06-20',type:'Out',category:'Transportation',account:'BCA 730',amount:103075,desc:'Top-up Flazz BCA'},
+    {id:'t7',date:'2026-06-20',type:'Out',category:'Lain-lain / Belum Jelas',account:'CIMB Credit Card (MC Plat Syariah)',amount:10000,desc:'QR payment, merchant tidak disebutkan'},
+    {id:'t8',date:'2026-06-21',type:'Out',category:'Transportation',account:'BCA 730',amount:50000,desc:'Top-up Flazz BCA, Ref 178200602896'},
+    {id:'t9',date:'2026-06-21',type:'Out',category:'Transportation',account:'BCA 730',amount:20480,desc:'SPBU 34.15 - isi bensin motor'},
+    {id:'t10',date:'2026-06-21',type:'Out',category:'Meals',account:'BCA 730',amount:26000,desc:'Kabita Ane - beli jus'},
+    {id:'t11',date:'2026-06-21',type:'Out',category:'Service Vehicle',account:'BCA 730',amount:247500,desc:'T3 MOTOR - servis motor'},
+    {id:'t12',date:'2026-06-21',type:'Out',category:'Meals',account:'BCA 730',amount:12100,desc:'ALFAMART R'},
+    {id:'t13',date:'2026-06-21',type:'Transfer',category:'Transfer Internal',account:'Permata -> BCA 730',amount:1000000,desc:'Transfer internal Permata Payroll ke BCA 7305025062'},
+    {id:'t14',date:'2026-06-21',type:'Out',category:'Transportation',account:'BCA 730',amount:222360,desc:'GoPay Later - GoRide (12 trip, 24 Mei-17 Jun)'},
+    {id:'t15',date:'2026-06-21',type:'Out',category:'Meals',account:'BCA 730',amount:294882,desc:'GoPay Later - GoFood (5 order, 19 Mei-17 Jun)'},
+    {id:'t16',date:'2026-06-21',type:'Out',category:'Meals',account:'BCA 730',amount:50000,desc:'QRIS - makan malam (baso)'},
+    {id:'t17',date:'2026-06-21',type:'Out',category:'Service Vehicle',account:'BCA 730',amount:114700,desc:'Gear Girbox Gigi Speedometer - MoonLight_SparepartMotorOri'},
+    {id:'t18',date:'2026-06-21',type:'Out',category:'Shopping/Belanja Online',account:'BCA 730',amount:187091,desc:'GoPay Later - Tokopedia (3 transaksi, 21 Mei-19 Jun)'},
+    {id:'t19',date:'2026-06-21',type:'Out',category:'Biaya Admin/Fee',account:'BCA 730',amount:56650,desc:'GoPay Later - biaya admin/proses pelunasan'},
+    {id:'t20',date:'2026-06-21',type:'Out',category:'Wellness (Hobbies & Travel)',account:'BCA 730',amount:30000,desc:'Main padel - transfer ke Agung Aditya Saputra'},
+    {id:'t21',date:'2026-06-22',type:'Out',category:'Meals',account:'BCA 730',amount:25000,desc:'WARUNG NAS'},
+    {id:'t22',date:'2026-06-22',type:'Out',category:'Transportation',account:'BCA 730',amount:38783,desc:'Top-up GoPay'},
+    {id:'t23',date:'2026-06-22',type:'Out',category:'Meals',account:'BCA 730',amount:13500,desc:'Kebab (ditagih temen)'},
+    {id:'t24',date:'2026-06-23',type:'Out',category:'Meals',account:'BCA 730',amount:59900,desc:'Beli rokok dan minuman'},
+    {id:'t25',date:'2026-06-23',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:2837444,desc:'Auto-debit KTA Xtra Dana (cicilan Rp2,637,444 + late charge Rp200,000)'}
+  ],
+  budgets: {
+    'Daughter Needs':0,'Utilities & Household':0,'Transportation':700000,
+    'Service Vehicle':200000,'Meals':600000,'Phone Credit':0,'Subscription':0,
+    'Wellness (Hobbies & Travel)':200000,'Shopping/Belanja Online':300000,
+    'Pembayaran Utang/Cicilan':3000000,'Biaya Admin/Fee':100000,'Lain-lain / Belum Jelas':100000
+  },
+  income: { salary:0, kprMonthly:0 }
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let S;
+function loadState() {
+  try { const d = localStorage.getItem('ricky_pfd_v2'); S = d ? JSON.parse(d) : JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+  catch(e) { S = JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+}
+function saveState() {
+  S.lastUpdated = new Date().toISOString().split('T')[0];
+  localStorage.setItem('ricky_pfd_v2', JSON.stringify(S));
+  document.getElementById('lastUpdated').textContent = 'Updated: ' + S.lastUpdated;
+}
+
+// ============================================================
+// FORMATTERS
+// ============================================================
+const fmtFull = n => {
+  if (n==null||isNaN(n)) return '—';
+  return 'Rp' + Math.round(n).toLocaleString('id-ID');
+};
+const fmt = n => {
+  if (n==null||isNaN(n)) return '—';
+  const a=Math.abs(n), sign=n<0?'-':'';
+  if(a>=1e9) return sign+'Rp'+(a/1e9).toFixed(2)+' M';
+  if(a>=1e6) return sign+'Rp'+(a/1e6).toFixed(2)+' Jt';
+  if(a>=1e3) return sign+'Rp'+(a/1e3).toFixed(1)+' K';
+  return sign+'Rp'+a.toFixed(0);
+};
+const pct = n => isNaN(n)?'—':(n*100).toFixed(1)+'%';
+const cv = (n,inv=false) => (!n||n===0)?'':(inv?n<0:n>0)?'pos':'neg';
+
+// ============================================================
+// COMPUTED
+// ============================================================
+function computed() {
+  const totalCash = S.banks.reduce((a,b)=>a+b.balance,0);
+  const investments = S.investments.map(inv => {
+    let nbv = 0;
+    if (inv.currentPrice > 0) {
+      nbv = inv.currency==='USD' ? inv.qty*inv.currentPrice*S.fxRate : inv.qty*inv.currentPrice;
+    } else if (inv.nbvOverride) nbv = inv.nbvOverride;
+    const pl = nbv - inv.costBasis;
+    return {...inv, nbv, pl, plPct: inv.costBasis>0?pl/inv.costBasis:0};
+  });
+  const totalInvest = investments.reduce((a,b)=>a+(b.nbv||0),0);
+  const totalCostBasis = investments.reduce((a,b)=>a+(b.costBasis||0),0);
+  const totalPL = investments.reduce((a,b)=>a+(b.pl||0),0);
+  const totalAssets = totalCash + totalInvest;
+  const totalCC = S.creditCards.reduce((a,b)=>a+b.outstanding,0);
+  const totalCCLimit = S.creditCards.reduce((a,b)=>a+b.limit,0);
+  const totalLoans = S.loans.reduce((a,b)=>a+b.remaining,0);
+  const totalLiab = totalCC + totalLoans;
+  const netWorth = totalAssets - totalLiab;
+
+  const now = new Date();
+  const cm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const thisMo = S.transactions.filter(t=>t.date.startsWith(cm));
+  const totalIn = thisMo.filter(t=>t.type==='In').reduce((a,b)=>a+b.amount,0);
+  const totalOut = thisMo.filter(t=>t.type==='Out').reduce((a,b)=>a+b.amount,0);
+  const netCF = totalIn - totalOut;
+
+  const totalMonthlyInstall = S.loans.reduce((a,b)=>a+(b.monthly||0),0) + (S.income.kprMonthly||0);
+  const salary = S.income.salary||0;
+  const dti = salary>0?totalMonthlyInstall/salary:null;
+  const ccUtil = totalCCLimit>0?totalCC/totalCCLimit:0;
+  const savingsRate = salary>0?(salary-totalOut)/salary:null;
+
+  const expByCat = {};
+  thisMo.filter(t=>t.type==='Out').forEach(t=>{ expByCat[t.category]=(expByCat[t.category]||0)+t.amount; });
+
+  return { totalCash,investments,totalInvest,totalCostBasis,totalPL,totalAssets,
+    totalCC,totalCCLimit,totalLoans,totalLiab,netWorth,totalIn,totalOut,netCF,
+    totalMonthlyInstall,salary,dti,ccUtil,savingsRate,expByCat };
+}
+
+// ============================================================
+// RENDER DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const c = computed();
+  const nwEl = document.getElementById('nw-total');
+  nwEl.textContent = fmtFull(c.netWorth);
+  nwEl.className = 'nw-value '+(c.netWorth>=0?'pos':'neg');
+  document.getElementById('nw-assets').textContent = fmtFull(c.totalAssets);
+  document.getElementById('nw-liabilities').textContent = fmtFull(c.totalLiab);
+  document.getElementById('nw-cash').textContent = fmtFull(c.totalCash);
+  document.getElementById('nw-cash-banks').innerHTML = S.banks.map(b=>
+    `<div class="nw-meta-item"><div class="nw-meta-label">${b.name} ${b.nick}</div>
+     <div class="nw-meta-value ${b.balance<0?'neg':''}">${fmtFull(b.balance)}</div></div>`
+  ).join('');
+  document.getElementById('nw-invest').textContent = fmtFull(c.totalInvest);
+
+  const cfEl = document.getElementById('kpi-cashflow');
+  cfEl.textContent = fmtFull(c.netCF);
+  cfEl.className = 'card-value '+(c.netCF>=0?'pos':'neg');
+  document.getElementById('kpi-cashflow-sub').textContent = `In: ${fmtFull(c.totalIn)} | Out: ${fmtFull(c.totalOut)}`;
+
+  const dtiEl = document.getElementById('kpi-dti');
+  if(c.dti!==null) {
+    dtiEl.textContent = pct(c.dti);
+    dtiEl.className = 'card-value '+(c.dti>0.3?'neg':c.dti>0.2?'':'pos');
+    const db = document.getElementById('dti-bar');
+    db.style.width = Math.min(c.dti*100,100)+'%';
+    db.className = 'progress-bar '+(c.dti>0.3?'bar-red':c.dti>0.2?'bar-yellow':'bar-green');
+  } else { dtiEl.textContent='N/A'; document.getElementById('kpi-dti-sub').textContent='Set salary di Dispatch'; }
+
+  const ccEl = document.getElementById('kpi-cc-util');
+  ccEl.textContent = pct(c.ccUtil);
+  ccEl.className = 'card-value '+(c.ccUtil>0.7?'neg':c.ccUtil>0.5?'':'pos');
+  document.getElementById('kpi-cc-sub').textContent = `${fmtFull(c.totalCC)} dari ${fmtFull(c.totalCCLimit)}`;
+  const ccb = document.getElementById('cc-bar');
+  ccb.style.width = Math.min(c.ccUtil*100,100)+'%';
+  ccb.className = 'progress-bar '+(c.ccUtil>0.7?'bar-red':c.ccUtil>0.5?'bar-yellow':'bar-green');
+
+  const srEl = document.getElementById('kpi-savings');
+  if(c.savingsRate!==null) {
+    srEl.textContent = pct(Math.max(c.savingsRate,0));
+    srEl.className = 'card-value '+(c.savingsRate>=0.2?'pos':c.savingsRate>=0.1?'':'neg');
+    document.getElementById('savings-bar').style.width = Math.min(Math.max(c.savingsRate,0)*100,100)+'%';
+  } else { srEl.textContent='N/A'; }
+
+  // Asset allocation
+  const cats = [
+    {label:'Cash', value:c.totalCash, color:'#4f7cff'},
+    {label:'Crypto (Binance + Indodax)', value:c.investments.filter(i=>i.type==='Crypto').reduce((a,b)=>a+(b.nbv||0),0), color:'#f59e0b'},
+    {label:'Saham IDX (Stockbit)', value:c.investments.filter(i=>i.type==='Saham IDX').reduce((a,b)=>a+(b.nbv||0),0), color:'#22c55e'},
+    {label:'ETF / Pluang', value:c.investments.filter(i=>i.type.includes('ETF')||i.platform==='Pluang').reduce((a,b)=>a+(b.nbv||0),0), color:'#a855f7'}
+  ];
+  document.getElementById('asset-alloc-table').innerHTML = cats.map(cat=>{
+    const p=c.totalAssets>0?cat.value/c.totalAssets:0;
+    return `<tr><td><span class="cat-dot" style="background:${cat.color}"></span>${cat.label}</td>
+      <td>${fmtFull(cat.value)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <div class="progress-wrap" style="flex:1;margin-top:0"><div class="progress-bar" style="width:${p*100}%;background:${cat.color}"></div></div>
+        <span style="min-width:42px;text-align:right;font-size:12px">${pct(p)}</span>
+      </div></td></tr>`;
+  }).join('') + `<tr class="tr-total"><td>Total Assets</td><td>${fmtFull(c.totalAssets)}</td><td>100%</td></tr>`;
+
+  document.getElementById('cash-bank-list').innerHTML = S.banks.map(b=>`
+    <div class="metric-row">
+      <div><div class="metric-name">${b.name} <span style="color:var(--muted);font-size:12px">${b.nick}</span></div>
+      <div style="font-size:11px;color:var(--muted)">${b.acct}</div></div>
+      <div class="metric-value ${b.balance<0?'neg':''}">${fmtFull(b.balance)}</div>
+    </div>`).join('') +
+    `<div class="metric-row"><div class="metric-name" style="font-weight:700">Total Cash</div><div class="metric-value">${fmtFull(c.totalCash)}</div></div>`;
+
+  // Top expenses
+  const topExp = Object.entries(c.expByCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const totalExpSnap = Object.values(c.expByCat).reduce((a,b)=>a+b,0);
+  const clrs = ['#ef4444','#f59e0b','#4f7cff','#22c55e','#a855f7','#64748b'];
+  document.getElementById('expense-snapshot').innerHTML = topExp.length===0
+    ? '<div style="color:var(--muted);padding:12px 0">Belum ada transaksi bulan ini</div>'
+    : topExp.map(([cat,val],i)=>{
+        const p=totalExpSnap>0?val/totalExpSnap:0;
+        return `<div class="budget-row"><div class="budget-row-head">
+          <span><span class="cat-dot" style="background:${clrs[i]}"></span>${cat}</span>
+          <span style="color:var(--muted);font-size:12px">${fmtFull(val)} · ${pct(p)}</span>
+        </div><div class="progress-wrap"><div class="progress-bar" style="width:${p*100}%;background:${clrs[i]}"></div></div></div>`;
+      }).join('');
+
+  document.getElementById('liabilities-snapshot').innerHTML = `
+    <div class="metric-row"><div class="metric-name">Credit Cards</div><div class="metric-value neg">${fmtFull(c.totalCC)}</div></div>
+    ${S.creditCards.map(cc=>`<div class="metric-row" style="padding-left:12px">
+      <div style="font-size:12px;color:var(--muted)">${cc.name}</div>
+      <div style="font-size:12px">${fmtFull(cc.outstanding)}<span style="color:var(--muted)"> / ${fmtFull(cc.limit)}</span></div>
+    </div>`).join('')}
+    <div class="metric-row"><div class="metric-name">KPR</div><div class="metric-value neg">${fmtFull(S.loans.find(l=>l.type==='KPR')?.remaining||0)}</div></div>
+    <div class="metric-row"><div class="metric-name">KTA</div><div class="metric-value neg">${fmtFull(S.loans.find(l=>l.type==='KTA')?.remaining||0)}</div></div>
+    <div class="metric-row"><div class="metric-name" style="font-weight:700">Total Liabilities</div><div class="metric-value neg">${fmtFull(c.totalLiab)}</div></div>`;
+
+  // Alerts
+  const alerts=[];
+  if(c.ccUtil>0.7) alerts.push({t:'red',m:`🚨 CC Utilization ${pct(c.ccUtil)} — di atas 70%! Risiko credit score & bunga.`});
+  else if(c.ccUtil>0.5) alerts.push({t:'yellow',m:`⚠️ CC Utilization ${pct(c.ccUtil)} — mendekati batas 70%.`});
+  if(c.dti!==null&&c.dti>0.3) alerts.push({t:'red',m:`🚨 DTI ${pct(c.dti)} — melebihi 30%! Review cicilan vs income.`});
+  if(c.totalCash<0) alerts.push({t:'red',m:`🚨 Total cash negatif (${fmtFull(c.totalCash)}) — CIMB 707 overdraft.`});
+  alerts.push({t:'yellow',m:`⏳ Pending refund Rp3,098,486 di CIMB MC Plat. Syariah (raket padel Tokopedia dibatalkan). Available limit belum dipulihkan.`});
+  alerts.push({t:'yellow',m:`⚠️ Late charge KTA Rp200,000 (23 Jun). Pastikan saldo CIMB 707 cukup tiap tgl 23 (min Rp2,637,444 + buffer).`});
+
+  document.getElementById('alerts-container').innerHTML = alerts.map(a=>
+    `<div class="alert alert-${a.t}">${a.m}</div>`).join('');
+
+  document.getElementById('lastUpdated').textContent = 'Updated: '+S.lastUpdated;
+}
+
+// ============================================================
+// RENDER ASSETS
+// ============================================================
+function renderAssets() {
+  const c=computed();
+  document.getElementById('assets-kpi').innerHTML = `
+    <div class="card"><div class="card-title">Total Assets</div><div class="card-value pos">${fmtFull(c.totalAssets)}</div><div class="card-sub">Cash + Investments NBV</div></div>
+    <div class="card"><div class="card-title">Total Cash</div><div class="card-value">${fmtFull(c.totalCash)}</div><div class="card-sub">${S.banks.length} rekening bank</div></div>
+    <div class="card"><div class="card-title">Investment Portfolio</div><div class="card-value">${fmtFull(c.totalInvest)}</div><div class="card-sub">P&L: <span class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</span></div></div>`;
+
+  document.getElementById('bank-table').innerHTML = S.banks.map(b=>`
+    <tr><td>${b.name}</td><td>${b.nick}</td><td><span class="badge badge-gray">${b.type}</span></td>
+    <td style="text-align:right" class="${b.balance<0?'neg':''}">${fmtFull(b.balance)}</td>
+    <td style="color:var(--muted);font-size:12px">${b.updated}</td></tr>`)
+    .join('') + `<tr class="tr-total"><td colspan="3">Total Cash</td><td style="text-align:right">${fmtFull(c.totalCash)}</td><td></td></tr>`;
+
+  document.getElementById('asset-summary-list').innerHTML =
+    `<div class="metric-row"><div class="metric-name">Cash (Bank)</div><div class="metric-value">${fmtFull(c.totalCash)}</div></div>` +
+    c.investments.filter(i=>i.costBasis>0||i.nbvOverride).map(i=>`
+    <div class="metric-row"><div>
+      <div class="metric-name">${i.platform} — ${i.ticker||'(kosong)'}</div>
+      <div style="font-size:11px;color:var(--muted)">${i.type}</div></div>
+      <div style="text-align:right">
+        <div class="metric-value">${fmtFull(i.nbv)}</div>
+        <div style="font-size:11px" class="${cv(i.pl)}">${i.pl>=0?'+':''}${fmtFull(i.pl)}</div>
+      </div></div>`).join('') +
+    `<div class="metric-row"><div class="metric-name" style="font-weight:700">Total Assets</div><div class="metric-value pos">${fmtFull(c.totalAssets)}</div></div>`;
+}
+
+// ============================================================
+// RENDER LIABILITIES
+// ============================================================
+function renderLiabilities() {
+  const c=computed();
+  document.getElementById('liab-kpi').innerHTML = `
+    <div class="card"><div class="card-title">Total Liabilities</div><div class="card-value neg">${fmtFull(c.totalLiab)}</div><div class="card-sub">CC + KPR + KTA</div></div>
+    <div class="card"><div class="card-title">Credit Cards</div><div class="card-value neg">${fmtFull(c.totalCC)}</div><div class="card-sub">Util: ${pct(c.ccUtil)} dari ${fmtFull(c.totalCCLimit)}</div></div>
+    <div class="card"><div class="card-title">Loans (KPR+KTA)</div><div class="card-value neg">${fmtFull(c.totalLoans)}</div><div class="card-sub">Outstanding principal</div></div>`;
+
+  document.getElementById('cc-table').innerHTML = S.creditCards.map(cc=>{
+    const u=cc.outstanding/cc.limit;
+    return `<tr><td><div>${cc.name}</div><div style="font-size:11px;color:var(--muted)">${cc.issuer}</div></td>
+      <td>${fmtFull(cc.limit)}</td><td class="neg">${fmtFull(cc.outstanding)}</td>
+      <td class="pos">${fmtFull(cc.limit-cc.outstanding)}</td>
+      <td><span class="badge ${u>0.7?'badge-red':u>0.5?'badge-yellow':'badge-green'}">${pct(u)}</span>
+        <div class="progress-wrap" style="margin-top:6px;width:100px"><div class="progress-bar ${u>0.7?'bar-red':u>0.5?'bar-yellow':'bar-green'}" style="width:${u*100}%"></div></div>
+      </td></tr>`;
+  }).join('') + `<tr class="tr-total"><td colspan="2">Total</td><td class="neg">${fmtFull(c.totalCC)}</td><td></td>
+    <td><span class="badge ${c.ccUtil>0.7?'badge-red':c.ccUtil>0.5?'badge-yellow':'badge-green'}">${pct(c.ccUtil)}</span></td></tr>`;
+
+  document.getElementById('loan-table').innerHTML = S.loans.map(l=>`
+    <tr><td><span class="badge badge-blue">${l.type}</span></td><td>${l.lender}</td>
+    <td class="neg">${fmtFull(l.remaining)}</td>
+    <td>${l.monthly>0?fmtFull(l.monthly):'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${l.tenor>0?l.tenor+' bln':'<span style="color:var(--muted)">—</span>'}</td></tr>`)
+    .join('') + `<tr class="tr-total"><td colspan="2">Total</td><td class="neg">${fmtFull(c.totalLoans)}</td><td></td><td></td></tr>`;
+
+  document.getElementById('liab-alerts').innerHTML = [
+    c.ccUtil>0.7?`<div class="alert alert-red">🚨 CIMB CC utilization ${pct(S.creditCards[0].outstanding/S.creditCards[0].limit)} — mendekati limit!</div>`:
+    c.ccUtil>0.5?`<div class="alert alert-yellow">⚠️ CC utilization overall ${pct(c.ccUtil)} — perhatikan.</div>`:'',
+    `<div class="alert alert-yellow">⏳ CC Permata: outstanding ${fmtFull(S.creditCards[1].outstanding)} dari limit ${fmtFull(S.creditCards[1].limit)} (${pct(S.creditCards[1].outstanding/S.creditCards[1].limit)}).</div>`,
+    `<div class="alert alert-yellow">⏳ KTA auto-debit tgl 23 tiap bulan via CIMB 707. Pastikan saldo min Rp2,637,444 + buffer.</div>`,
+    `<div class="alert alert-yellow">⏳ Pending refund Rp3,098,486 di CIMB MC Plat. Syariah — raket padel Tokopedia (dibatalkan).</div>`
+  ].filter(Boolean).join('');
+}
+
+// ============================================================
+// RENDER INVESTMENTS
+// ============================================================
+function renderInvestments() {
+  const c=computed();
+  document.getElementById('invest-kpi').innerHTML = `
+    <div class="card"><div class="card-title">Total NBV</div><div class="card-value">${fmtFull(c.totalInvest)}</div><div class="card-sub">Net Book Value</div></div>
+    <div class="card"><div class="card-title">Cost Basis</div><div class="card-value">${fmtFull(c.totalCostBasis)}</div><div class="card-sub">Modal masuk</div></div>
+    <div class="card"><div class="card-title">Unrealized P&L</div><div class="card-value ${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</div>
+      <div class="card-sub">${c.totalCostBasis>0?pct(c.totalPL/c.totalCostBasis)+' return':''}</div></div>
+    <div class="card"><div class="card-title">FX Rate USD/IDR</div><div class="card-value">${S.fxRate.toLocaleString('id-ID')}</div><div class="card-sub">Kurs untuk convert</div></div>`;
+
+  document.getElementById('invest-table').innerHTML = c.investments.map(inv=>{
+    if(inv.costBasis===0&&!inv.nbvOverride&&inv.qty===0)
+      return `<tr style="opacity:.4"><td>${inv.platform}</td><td>${inv.ticker||'<i style="color:var(--muted)">kosong</i>'}</td><td>${inv.type}</td><td colspan="7" style="color:var(--muted);font-style:italic">Belum ada data — isi via Dispatch</td></tr>`;
+    const portPct=c.totalInvest>0?inv.nbv/c.totalInvest:0;
+    return `<tr>
+      <td><span class="badge badge-blue">${inv.platform}</span></td>
+      <td style="font-weight:600">${inv.ticker||'—'}</td><td>${inv.type}</td>
+      <td>${inv.qty||'—'}</td>
+      <td style="text-align:right">${fmtFull(inv.costBasis)}</td>
+      <td style="text-align:right">${inv.currentPrice>0?(inv.currency==='USD'?'$'+inv.currentPrice.toFixed(2):fmtFull(inv.currentPrice)):'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="text-align:right;font-weight:600">${fmtFull(inv.nbv)}</td>
+      <td style="text-align:right" class="${cv(inv.pl)}">${inv.pl>=0?'+':''}${fmtFull(inv.pl)}</td>
+      <td style="text-align:right" class="${cv(inv.plPct)}">${inv.costBasis>0?pct(inv.plPct):'—'}</td>
+      <td style="text-align:right">${pct(portPct)}</td></tr>`;
+  }).join('') + `<tr class="tr-total">
+    <td colspan="4">TOTAL</td>
+    <td style="text-align:right">${fmtFull(c.totalCostBasis)}</td><td></td>
+    <td style="text-align:right">${fmtFull(c.totalInvest)}</td>
+    <td style="text-align:right" class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</td>
+    <td style="text-align:right" class="${cv(c.totalPL)}">${c.totalCostBasis>0?pct(c.totalPL/c.totalCostBasis):''}</td>
+    <td style="text-align:right">100%</td></tr>`;
+}
+
+// ============================================================
+// RENDER TRANSACTIONS
+// ============================================================
+function renderTransactions() {
+  const fm=document.getElementById('filter-month').value;
+  const ft=document.getElementById('filter-type').value;
+  const fc=document.getElementById('filter-cat').value;
+  let trx=[...S.transactions].sort((a,b)=>b.date.localeCompare(a.date));
+  if(fm) trx=trx.filter(t=>t.date.startsWith(fm));
+  if(ft) trx=trx.filter(t=>t.type===ft);
+  if(fc) trx=trx.filter(t=>t.category===fc);
+
+  document.getElementById('trx-count').textContent=trx.length+' transaksi';
+  const tc={In:'badge-green',Out:'badge-red',Transfer:'badge-blue'};
+  document.getElementById('trx-table-body').innerHTML = trx.length===0
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Tidak ada transaksi</td></tr>'
+    : trx.map(t=>`<tr>
+        <td style="color:var(--muted);font-size:12px;white-space:nowrap">${t.date}</td>
+        <td><span class="badge ${tc[t.type]||'badge-gray'}">${t.type}</span></td>
+        <td style="font-size:12px">${t.category}</td>
+        <td style="font-size:12px;color:var(--muted)">${t.account}</td>
+        <td style="text-align:right;font-weight:600" class="${t.type==='In'?'pos':t.type==='Out'?'neg':''}">
+          ${t.type==='In'?'+':''}${fmtFull(t.amount)}</td>
+        <td style="font-size:12px;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.desc}">${t.desc}</td>
+        <td><button class="btn btn-danger btn-sm del-btn" onclick="deleteTransaction('${t.id}')">×</button></td>
+      </tr>`).join('');
+
+  const tIn=trx.filter(t=>t.type==='In').reduce((a,b)=>a+b.amount,0);
+  const tOut=trx.filter(t=>t.type==='Out').reduce((a,b)=>a+b.amount,0);
+  document.getElementById('trx-summary-row').innerHTML = `
+    <div class="card" style="padding:12px 16px;flex:1;min-width:140px"><div class="card-title" style="margin-bottom:4px">Total In</div><div style="font-size:18px;font-weight:700" class="pos">+${fmtFull(tIn)}</div></div>
+    <div class="card" style="padding:12px 16px;flex:1;min-width:140px"><div class="card-title" style="margin-bottom:4px">Total Out</div><div style="font-size:18px;font-weight:700" class="neg">${fmtFull(tOut)}</div></div>
+    <div class="card" style="padding:12px 16px;flex:1;min-width:140px"><div class="card-title" style="margin-bottom:4px">Net Cash Flow</div><div style="font-size:18px;font-weight:700" class="${tIn-tOut>=0?'pos':'neg'}">${fmtFull(tIn-tOut)}</div></div>`;
+}
+
+function renderBudget() {
+  const c=computed();
+  const tOut=Object.values(c.expByCat).reduce((a,b)=>a+b,0);
+  document.getElementById('budget-kpi-row').innerHTML = `
+    <div class="card"><div class="card-title">Total Income Actual</div><div class="card-value pos">${fmtFull(c.totalIn)}</div></div>
+    <div class="card"><div class="card-title">Total Expense Actual</div><div class="card-value neg">${fmtFull(tOut)}</div></div>
+    <div class="card"><div class="card-title">Sisa (REST)</div><div class="card-value ${c.totalIn-tOut>=0?'pos':'neg'}">${fmtFull(c.totalIn-tOut)}</div></div>`;
+
+  const allCats=Object.keys(S.budgets);
+  const clrs2=['#4f7cff','#f59e0b','#22c55e','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#64748b','#8b5cf6','#06b6d4','#d946ef'];
+  document.getElementById('budget-bars').innerHTML = allCats.map((cat,i)=>{
+    const actual=c.expByCat[cat]||0;
+    const budget=S.budgets[cat]||0;
+    const pu=budget>0?actual/budget:(actual>0?1:0);
+    const bc=pu>1?'var(--red)':pu>0.8?'var(--yellow)':clrs2[i%clrs2.length];
+    return `<div class="budget-row"><div class="budget-row-head">
+      <span><span class="cat-dot" style="background:${clrs2[i%clrs2.length]}"></span>${cat}</span>
+      <span style="color:var(--muted);font-size:12px">
+        <span class="${pu>1?'neg':''}">${fmtFull(actual)}</span>
+        ${budget>0?' / '+fmtFull(budget):''}
+        ${budget>0?` <span class="badge ${pu>1?'badge-red':pu>0.8?'badge-yellow':'badge-green'}">${pct(pu)}</span>`:''}
+      </span></div>
+      ${budget>0?`<div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(pu,1)*100}%;background:${bc}"></div></div>`:''}</div>`;
+  }).join('');
+
+  document.getElementById('budget-edit-form').innerHTML = '<div class="form-grid">' +
+    allCats.map(cat=>`
+      <div class="form-group"><label>${cat}</label>
+        <input type="number" id="budg-${cat.replace(/[^a-z0-9]/gi,'_')}" value="${S.budgets[cat]||0}">
+      </div>`).join('') + '</div>';
+}
+
+// ============================================================
+// RENDER DISPATCH
+// ============================================================
+function renderDispatch() {
+  document.getElementById('bank-balance-inputs').innerHTML = S.banks.map((b,i)=>`
+    <div class="form-group"><label>${b.name} — ${b.nick}</label>
+      <input type="number" id="bbal-${i}" value="${b.balance}" step="0.01"></div>`).join('');
+
+  document.getElementById('cc-balance-inputs').innerHTML = S.creditCards.map((cc,i)=>`
+    <div class="form-group"><label>${cc.name} — Outstanding</label>
+      <input type="number" id="ccbal-${i}" value="${cc.outstanding}" step="0.01"></div>`).join('');
+
+  const hasData = inv => inv.ticker || inv.costBasis > 0;
+  document.getElementById('invest-price-inputs').innerHTML = '<div class="form-grid">' +
+    S.investments.filter(hasData).map((inv,i)=>`
+      <div class="form-group"><label>${inv.platform} — ${inv.ticker||'(no ticker)'} (${inv.currency})</label>
+        <input type="number" id="invp-${i}" value="${inv.currentPrice||0}" step="any" placeholder="Harga saat ini"></div>`)
+    .join('') + '</div>';
+
+  document.getElementById('d-fxrate').value = S.fxRate;
+  document.getElementById('d-salary').value = S.income.salary||0;
+  document.getElementById('d-kpr').value = S.income.kprMonthly||0;
+  document.getElementById('d-date').value = new Date().toISOString().split('T')[0];
+}
+
+// ============================================================
+// POPULATE FILTERS
+// ============================================================
+function populateFilters() {
+  const months=[...new Set(S.transactions.map(t=>t.date.substring(0,7)))].sort().reverse();
+  const curr=new Date().toISOString().substring(0,7);
+  const mSel=document.getElementById('filter-month');
+  mSel.innerHTML='<option value="">Semua Bulan</option>'+months.map(m=>`<option value="${m}"${m===curr?' selected':''}>${m}</option>`).join('');
+  const cats=[...new Set(S.transactions.map(t=>t.category))].sort();
+  document.getElementById('filter-cat').innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option>${c}</option>`).join('');
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function addTransaction() {
+  const date=document.getElementById('d-date').value;
+  const amount=parseFloat(document.getElementById('d-amount').value);
+  if(!date||!amount||isNaN(amount)||amount<=0){ toast('Isi tanggal & amount!','red'); return; }
+  S.transactions.push({
+    id:'t'+Date.now(),date,
+    type:document.getElementById('d-type').value,
+    category:document.getElementById('d-category').value,
+    account:document.getElementById('d-account').value,
+    amount,desc:document.getElementById('d-desc').value
+  });
+  saveState(); populateFilters(); renderAll(); clearForm(); toast('Transaksi ditambah!');
+}
+function deleteTransaction(id) {
+  if(!confirm('Hapus transaksi ini?')) return;
+  S.transactions=S.transactions.filter(t=>t.id!==id);
+  saveState(); populateFilters(); renderAll(); toast('Dihapus');
+}
+function clearForm() {
+  document.getElementById('d-amount').value='';
+  document.getElementById('d-desc
