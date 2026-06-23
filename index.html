@@ -1287,3 +1287,20 @@ renderAll();
 // ============================================================
 // AUTO PRICE UPDATE (reads prices.json, loops every 6 hours)
 //
+function updatePrices() {
+  fetch('prices.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(p => {
+      if (p.fx_idr) S.fxRate = p.fx_idr;
+      S.investments.forEach(inv => {
+        if (inv.ticker && p[inv.ticker]) { inv.currentPrice = p[inv.ticker]; delete inv.nbvOverride; }
+      });
+      saveState(); renderAll();
+    })
+    .catch(() => {});
+}
+updatePrices();
+setInterval(updatePrices, 6*60*60*1000);
+</script>
+</body>
+</html>
