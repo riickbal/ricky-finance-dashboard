@@ -175,10 +175,10 @@
       </div>
     </div>
     <div class="nw-card" style="margin-bottom:0;background:linear-gradient(135deg,#1a2535,#1e3040)">
-      <div class="nw-label">💵 Cash Balance</div>
-      <div class="nw-value" id="nw-cash">—</div>
-      <div class="card-sub" style="margin-top:6px">Total semua rekening bank</div>
-      <div class="nw-meta" id="nw-cash-banks"></div>
+      <div class="nw-label">📈 Investment P&L</div>
+      <div class="nw-value" id="nw-invest-pnl">—</div>
+      <div class="card-sub" style="margin-top:6px">Unrealized gain/loss semua aset</div>
+      <div class="nw-meta" id="nw-invest-breakdown"></div>
     </div>
   </div>
   <div class="grid-4">
@@ -764,12 +764,31 @@ function renderDashboard() {
   nwEl.className = 'nw-value '+(c.netWorth>=0?'pos':'neg');
   document.getElementById('nw-assets').textContent = fmtFull(c.totalAssets);
   document.getElementById('nw-liabilities').textContent = fmtFull(c.totalLiab);
-  document.getElementById('nw-cash').textContent = fmtFull(c.totalCash);
-  document.getElementById('nw-cash-banks').innerHTML = S.banks.map(b=>
-    `<div class="nw-meta-item"><div class="nw-meta-label">${b.name} ${b.nick}</div>
-     <div class="nw-meta-value ${b.balance<0?'neg':''}">${fmtFull(b.balance)}</div></div>`
-  ).join('');
   document.getElementById('nw-invest').textContent = fmtFull(c.totalInvest);
+
+  // Investment P&L card
+  const totalPnl = c.investments.reduce((a,inv)=>{
+    const cost = (inv.qty||0)*(inv.costBasis||0);
+    const curr = inv.nbv||0;
+    return a + (curr - cost);
+  }, 0);
+  const pnlEl = document.getElementById('nw-invest-pnl');
+  pnlEl.textContent = (totalPnl>=0?'+':'')+fmtFull(totalPnl);
+  pnlEl.className = 'nw-value '+(totalPnl>=0?'pos':'neg');
+
+  const activeInv = c.investments.filter(inv=>(inv.qty||0)>0||(inv.nbv||0)>0);
+  document.getElementById('nw-invest-breakdown').innerHTML = activeInv.length===0
+    ? '<div class="nw-meta-item"><div class="nw-meta-label" style="color:var(--muted)">Belum ada data investasi</div></div>'
+    : activeInv.slice(0,4).map(inv=>{
+        const cost = (inv.qty||0)*(inv.costBasis||0);
+        const curr = inv.nbv||0;
+        const pnl = curr - cost;
+        const pnlPct = cost>0 ? pnl/cost : 0;
+        return `<div class="nw-meta-item">
+          <div class="nw-meta-label">${inv.ticker||inv.name} <span style="font-size:10px;color:var(--muted)">${inv.platform||''}</span></div>
+          <div class="nw-meta-value ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${fmtFull(pnl)} <span style="font-size:11px">(${pnlPct>=0?'+':''}${(pnlPct*100).toFixed(1)}%)</span></div>
+        </div>`;
+      }).join('');
 
   const cfEl = document.getElementById('kpi-cashflow');
   cfEl.textContent = fmtFull(c.netCF);
@@ -1267,34 +1286,4 @@ renderAll();
 
 // ============================================================
 // AUTO PRICE UPDATE (reads prices.json, loops every 6 hours)
-// ============================================================
-async function autoUpdatePrices() {
-  try {
-    const resp = await fetch('prices.json?t=' + Date.now());
-    if (!resp.ok) return;
-    const p = await resp.json();
-    let changed = false;
-
-    S.investments.forEach(inv => {
-      if (inv.ticker === 'VOO'  && p.VOO)    { inv.currentPrice = p.VOO;    changed = true; }
-      if (inv.ticker === 'BBRI' && p.BBRI)   { inv.currentPrice = p.BBRI;   changed = true; }
-    });
-    if (p.USDIDR && p.USDIDR > 0) { S.fxRate = Math.round(p.USDIDR); changed = true; }
-
-    if (changed) {
-      if (p.updated) S.lastUpdated = p.updated.substring(0, 10) + ' (auto)';
-      saveState();
-      renderAll();
-      console.log('[AutoPrice] updated:', p.updated);
-    }
-  } catch(e) {
-    console.log('[AutoPrice] skipped (offline / local):', e.message);
-  }
-}
-
-autoUpdatePrices();
-setInterval(autoUpdatePrices, 6 * 60 * 60 * 1000);
-
-</script>
-</body>
-</html>
+//
