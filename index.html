@@ -592,7 +592,6 @@
 
 <div id="toast"></div>
 
-<script src="data.js"></script>
 <script>
 // ============================================================
 // DEFAULT STATE (seeded from Excel)
@@ -1278,11 +1277,15 @@ function copyDataJs() {
 }
 
 // ============================================================
-// INIT
+// INIT — load data.js fresh (no cache) then render
 // ============================================================
-loadState();
-populateFilters();
-renderAll();
+function initDashboard() {
+  loadState();
+  populateFilters();
+  renderAll();
+  updatePrices();
+  setInterval(updatePrices, 6*60*60*1000);
+}
 
 // ============================================================
 // AUTO PRICE UPDATE (reads prices.json, loops every 6 hours)
@@ -1296,11 +1299,4 @@ function updatePrices() {
         if (inv.ticker && p[inv.ticker]) { inv.currentPrice = p[inv.ticker]; delete inv.nbvOverride; }
       });
       saveState(); renderAll();
-    })
-    .catch(() => {});
-}
-updatePrices();
-setInterval(updatePrices, 6*60*60*1000);
-</script>
-</body>
-</html>
+    
