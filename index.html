@@ -215,7 +215,7 @@
       </table></div>
     </div>
     <div class="card">
-      <div class="card-title">Cash per Bank</div>
+      <div class="card-title">Cash per Account</div>
       <div id="cash-bank-list"></div>
     </div>
   </div>
@@ -234,52 +234,178 @@
 <!-- DISPATCH -->
 <div class="page" id="page-dispatch">
 
-  <!-- PANDUAN -->
-  <div style="background:rgba(79,124,255,.08);border:1px solid rgba(79,124,255,.25);border-radius:12px;padding:20px;margin-bottom:24px">
-    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📋 Cara Pakai Dispatch</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;font-size:13px">
-      <div>
-        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">1️⃣ Ada mutasi baru?</div>
-        <div style="color:var(--muted);line-height:1.6">Isi form <b style="color:var(--text)">Tambah Transaksi</b> di bawah.<br>
-        • <b style="color:var(--text)">Tipe Out</b> = lo ngeluarin duit (belanja, bensin, makan, bayar cicilan)<br>
-        • <b style="color:var(--text)">Tipe In</b> = duit masuk (gaji, transfer masuk)<br>
-        • <b style="color:var(--text)">Transfer</b> = pindah antar rekening sendiri<br>
-        Klik <b style="color:var(--green)">+ Tambah</b> → dashboard langsung update.</div>
-      </div>
-      <div>
-        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">2️⃣ Saldo bank berubah?</div>
-        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update Saldo Bank</b>.<br>
-        Copy angka saldo terbaru dari m-BCA / Livin / screenshot → paste ke kolom rekening yang sesuai → <b style="color:var(--green)">Simpan Saldo</b>.</div>
-      </div>
-      <div>
-        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">3️⃣ Ada tagihan CC baru?</div>
-        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update CC Outstanding</b>.<br>
-        Isi outstanding terbaru dari aplikasi bank → <b style="color:var(--green)">Simpan CC</b>.<br>
-        Dashboard otomatis recalculate utilization %.</div>
-      </div>
-      <div>
-        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">4️⃣ Update investasi?</div>
-        <div style="color:var(--muted);line-height:1.6">Scroll ke <b style="color:var(--text)">Update Harga Investasi</b>.<br>
-        Isi harga terkini VOO (USD) / BBRI (IDR) / crypto → update juga <b style="color:var(--text)">FX Rate</b> → <b style="color:var(--green)">Simpan Harga</b>.<br>
-        P&L & NBV langsung ke-recalc.</div>
-      </div>
-      <div>
-        <div style="font-weight:700;color:var(--accent);margin-bottom:6px">5️⃣ Pertama kali setup?</div>
-        <div style="color:var(--muted);line-height:1.6">Scroll paling bawah ke <b style="color:var(--text)">Set Income Bulanan</b>.<br>
-        Isi <b style="color:var(--text)">take-home salary</b> + <b style="color:var(--text)">cicilan KPR</b> → <b style="color:var(--green)">Simpan</b>.<br>
-        Ini kunci biar DTI & Savings Rate bisa ke-kalkulasi.</div>
-      </div>
-      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px">
-        <div style="font-weight:700;color:var(--yellow);margin-bottom:6px">⚡ Tips Kategori</div>
-        <div style="color:var(--muted);font-size:12px;line-height:1.7">
-          <b style="color:var(--text)">Bayar CC</b> → Pembayaran Utang/Cicilan<br>
-          <b style="color:var(--text)">Top-up e-wallet / Flazz</b> → Transportation<br>
-          <b style="color:var(--text)">GoFood / GoPay Later</b> → Meals<br>
-          <b style="color:var(--text)">Transfer ke rekening sendiri</b> → Transfer Internal<br>
-          <b style="color:var(--text)">Tidak jelas</b> → Lain-lain / Belum Jelas
+  <!-- SOP DISPATCH -->
+  <div style="margin-bottom:24px">
+
+    <!-- HEADER -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px">
+      <div style="font-size:16px;font-weight:800;margin-bottom:4px">📋 SOP Dispatch — Personal Finance Dashboard</div>
+      <div style="font-size:12px;color:var(--muted)">Semua perubahan data keuangan wajib lewat sini. Claude auto-sync ke data.js setelah lo kasih info.</div>
+    </div>
+
+    <!-- MAIN FLOW -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px">🔄 Main Flow — Pilih Skenario Lo</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid var(--accent)">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">💸 Ada Pengeluaran / Pemasukan</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            1. Lihat mutasi di app bank<br>
+            2. Tentukan <b style="color:var(--text)">Tipe</b>:<br>
+            &nbsp;&nbsp;• <span style="color:#ef4444">Out</span> = lo bayar / keluar duit<br>
+            &nbsp;&nbsp;• <span style="color:#22c55e">In</span> = duit masuk ke lo<br>
+            &nbsp;&nbsp;• <span style="color:#4f7cff">Transfer</span> = antar rekening sendiri<br>
+            3. Pilih <b style="color:var(--text)">Kategori</b> (lihat tabel bawah)<br>
+            4. Pilih <b style="color:var(--text)">Account</b> yang kena mutasi<br>
+            5. Isi amount & deskripsi → <b style="color:#22c55e">+ Tambah</b>
+          </div>
         </div>
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid #4f7cff">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">🏦 Update Saldo Bank</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            1. Buka m-BCA / Livin / app bank<br>
+            2. Screenshot atau catat saldo terbaru<br>
+            3. Scroll ke <b style="color:var(--text)">Update Saldo Bank</b><br>
+            4. Paste angka per rekening<br>
+            5. Klik <b style="color:#22c55e">Simpan Saldo</b><br>
+            <span style="color:var(--yellow)">⚠️ Wajib update kalau saldo berbeda jauh dari yang tampil</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid #ef4444">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">💳 Update CC</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            1. Buka app CIMB / Permata<br>
+            2. Cek outstanding balance terbaru<br>
+            3. Scroll ke <b style="color:var(--text)">Update CC Outstanding</b><br>
+            4. Isi nilai outstanding per kartu<br>
+            5. Klik <b style="color:#22c55e">Simpan CC</b><br>
+            <span style="color:var(--yellow)">⚠️ Update setelah bayar CC atau ada transaksi besar</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid #a855f7">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">📈 Update Investasi</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            1. Cek harga terbaru di Pluang / Stockbit<br>
+            2. Cek FX rate USD/IDR (Google: "usd to idr")<br>
+            3. Scroll ke <b style="color:var(--text)">Update Harga Investasi</b><br>
+            4. Isi current price per aset<br>
+            5. Update FX Rate → <b style="color:#22c55e">Simpan Harga</b><br>
+            <span style="color:#a855f7">NBV & P&L otomatis recalc</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid #22c55e">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">➕ Tambah Rekening / Aset Baru</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            1. Kasih tau Claude: nama bank + no. rekening<br>
+            2. Claude tanya: <b style="color:var(--text)">e-Wallet, Bank, atau Bank Digital?</b><br>
+            3. Claude update data.js langsung<br>
+            4. Refresh browser → tampil di dashboard<br>
+            <span style="color:#22c55e">Jangan langsung edit file — selalu lewat Claude</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;border-left:3px solid #f59e0b">
+          <div style="font-weight:700;margin-bottom:8px;font-size:13px">📤 Sync ke data.js</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">
+            Setelah semua input selesai:<br>
+            1. Klik <b style="color:#22c55e">⬇️ Download data.js terbaru</b><br>
+            2. Replace file <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">data.js</code> di folder project<br>
+            3. Refresh browser → data persisten<br>
+            <b style="color:#f59e0b">Atau: kasih tau Claude → Claude update langsung</b>
+          </div>
+        </div>
+
       </div>
     </div>
+
+    <!-- CATEGORY SOP TABLE -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">🗂️ SOP Kategori — Pilih Yang Mana?</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;font-size:12px">
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:var(--accent);margin-bottom:8px">💰 INCOME (Tipe: In)</div>
+          <div style="display:flex;flex-direction:column;gap:5px;color:var(--muted)">
+            <div><span style="color:var(--text);font-weight:600">Income - Salary</span> — Gaji / THR / bonus dari kantor</div>
+            <div><span style="color:var(--text);font-weight:600">Income - Other</span> — Transfer masuk dari orang lain, refund, cashback, fee</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:#ef4444;margin-bottom:8px">🏠 LIVING (Tipe: Out)</div>
+          <div style="display:flex;flex-direction:column;gap:5px;color:var(--muted)">
+            <div><span style="color:var(--text);font-weight:600">Meals</span> — Semua yang masuk perut: makan, minum, GoFood, warung, kafe</div>
+            <div><span style="color:var(--text);font-weight:600">Utilities & Household</span> — Listrik, air, internet, gas, kebutuhan rumah</div>
+            <div><span style="color:var(--text);font-weight:600">Transportation</span> — Bensin, tol, parkir, Flazz, GoPay top-up, ojek, KRL</div>
+            <div><span style="color:var(--text);font-weight:600">Service Vehicle</span> — Servis motor/mobil, sparepart, bengkel</div>
+            <div><span style="color:var(--text);font-weight:600">Phone Credit</span> — Pulsa, paket data</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:#a855f7;margin-bottom:8px">🎯 LIFESTYLE (Tipe: Out)</div>
+          <div style="display:flex;flex-direction:column;gap:5px;color:var(--muted)">
+            <div><span style="color:var(--text);font-weight:600">Wellness (Hobbies & Travel)</span> — Padel, gym, sport, hiburan, liburan</div>
+            <div><span style="color:var(--text);font-weight:600">Shopping/Belanja Online</span> — Tokopedia, Shopee, beli barang non-kebutuhan</div>
+            <div><span style="color:var(--text);font-weight:600">Subscription</span> — Netflix, Spotify, iCloud, app berbayar bulanan</div>
+            <div><span style="color:var(--text);font-weight:600">Daughter Needs</span> — Semua kebutuhan anak</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:#f59e0b;margin-bottom:8px">🏦 FINANCIAL (Tipe: Out)</div>
+          <div style="display:flex;flex-direction:column;gap:5px;color:var(--muted)">
+            <div><span style="color:var(--text);font-weight:600">Pembayaran Utang/Cicilan</span> — Bayar CC, cicilan KTA, KPR, auto-debit apapun</div>
+            <div><span style="color:var(--text);font-weight:600">Biaya Admin/Fee</span> — Biaya transfer, admin bank, denda, late charge</div>
+            <div><span style="color:var(--text);font-weight:600">Transfer Internal</span> — Pindah antar rekening SENDIRI (Tipe: Transfer, bukan Out)</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:var(--muted);margin-bottom:8px">❓ LAIN-LAIN</div>
+          <div style="display:flex;flex-direction:column;gap:5px;color:var(--muted)">
+            <div><span style="color:var(--text);font-weight:600">Lain-lain / Belum Jelas</span> — Merchant tidak jelas, belum bisa dikategorikan. <b style="color:#f59e0b">Nanti bisa direview</b></div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:rgba(245,158,11,.08);border-radius:6px;font-size:11px;color:#fcd34d">
+            💡 <b>Rule of thumb:</b> Kalau ragu, pilih Lain-lain. Claude bisa bantu re-kategorikan nanti kalau lo kasih deskripsinya.
+          </div>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <div style="font-weight:700;color:#22c55e;margin-bottom:8px">✅ Quick Reference</div>
+          <div style="display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:11px">
+            <div>GoPay Later (lunas) → <span style="color:var(--text)">sesuai isi transaksinya</span></div>
+            <div>Top-up GoPay / OVO / Dana → <span style="color:var(--text)">Transportation</span></div>
+            <div>Top-up Flazz → <span style="color:var(--text)">Transportation</span></div>
+            <div>Bayar tagihan CC → <span style="color:var(--text)">Pembayaran Utang/Cicilan</span></div>
+            <div>Cicilan KTA auto-debit → <span style="color:var(--text)">Pembayaran Utang/Cicilan</span></div>
+            <div>Beli saham / top-up invest → <span style="color:var(--text)">update via Harga Investasi</span></div>
+            <div>Refund masuk → <span style="color:var(--text)">Income - Other</span></div>
+            <div>Transfer ke istri/keluarga → <span style="color:var(--text)">Lain-lain (atau buat kategori baru)</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- NEW CATEGORY SOP -->
+    <div style="background:rgba(79,124,255,.06);border:1px solid rgba(79,124,255,.2);border-radius:12px;padding:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">➕ SOP Tambah Kategori Baru</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.9">
+        Kalau ada transaksi yang ga cocok dengan kategori yang ada:<br>
+        <b style="color:var(--text)">Step 1:</b> Kasih tau Claude — "ada kategori baru: [nama kategori], contoh transaksinya [deskripsi]"<br>
+        <b style="color:var(--text)">Step 2:</b> Claude konfirmasi apakah perlu kategori baru atau bisa masuk kategori existing<br>
+        <b style="color:var(--text)">Step 3:</b> Kalau deal → Claude tambah ke dropdown Dispatch + budget table + data.js sekaligus<br>
+        <b style="color:var(--text)">Step 4:</b> Refresh browser → kategori baru langsung tersedia<br>
+        <span style="color:#f59e0b">⚠️ Jangan tambah kategori sembarangan — makin banyak kategori makin susah analisis. Diskusi dulu sama Claude.</span>
+      </div>
+    </div>
+
   </div>
 
   <div class="dispatch-form">
@@ -348,6 +474,16 @@
     <button class="btn btn-primary" onclick="saveInvestmentPrices()">Simpan Harga</button>
   </div>
 
+  <div class="dispatch-form" style="background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.3)">
+    <h2>📤 Export → data.js</h2>
+    <p>Setelah tambah transaksi/update data via Dispatch, klik tombol ini → download file <b>data.js</b> baru → replace file di folder project. Ini biar Dispatch selalu sync sama file project.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-green" onclick="exportDataJs()">⬇️ Download data.js terbaru</button>
+      <button class="btn btn-ghost" onclick="copyDataJs()">📋 Copy ke clipboard</button>
+    </div>
+    <div id="export-hint" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+  </div>
+
   <div class="dispatch-form" style="margin-bottom:0">
     <h2>💰 Set Income Bulanan</h2>
     <p>Dipakai untuk kalkulasi DTI &amp; Savings Rate.</p>
@@ -404,7 +540,7 @@
     <div class="card">
       <div class="card-title">Bank Accounts</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Bank</th><th>Nickname</th><th>Tipe</th><th style="text-align:right">Balance</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Bank</th><th>Account</th><th>Kategori</th><th style="text-align:right">Balance</th><th>Updated</th></tr></thead>
         <tbody id="bank-table"></tbody>
       </table></div>
     </div>
@@ -456,6 +592,7 @@
 
 <div id="toast"></div>
 
+<script src="data.js"></script>
 <script>
 // ============================================================
 // DEFAULT STATE (seeded from Excel)
@@ -464,11 +601,11 @@ const DEFAULT_STATE = {
   fxRate: 17819,
   lastUpdated: '2026-06-23',
   banks: [
-    { name:'BCA', nick:'blu by BCA', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
-    { name:'BCA', nick:'m-Info Acct 1 (730)', type:'Tabungan', balance:74454.14, updated:'2026-06-22', acct:'****5062' },
-    { name:'BCA', nick:'m-Info Acct 2 (245)', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
-    { name:'Permata', nick:'Payroll Account', type:'Payroll/Giro', balance:16000000.52, updated:'2026-06-21', acct:'****4829' },
-    { name:'CIMB Niaga', nick:'Auto-debit KTA', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'707165742xx' }
+    { name:'Blu By BCA', nick:'blu by BCA', cat:'Digital Bank', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
+    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:74454.14, updated:'2026-06-22', acct:'****5062' },
+    { name:'BCA', nick:'m-Info Acct 2 (245)', cat:'Bank', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
+    { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:16000000.52, updated:'2026-06-21', acct:'****4829' },
+    { name:'CIMB Niaga', nick:'Auto-debit KTA', cat:'Bank', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'****4200' }
   ],
   creditCards: [
     { name:'CC CIMB', issuer:'CIMB Niaga Syariah', limit:59200000, outstanding:20205890.33, dueDate:'', notes:'Rp3,098,486 PENDING REFUND (raket padel Tokopedia dibatalkan). Available limit belum dipulihkan.' },
@@ -510,7 +647,8 @@ const DEFAULT_STATE = {
     {id:'t22',date:'2026-06-22',type:'Out',category:'Transportation',account:'BCA 730',amount:38783,desc:'Top-up GoPay'},
     {id:'t23',date:'2026-06-22',type:'Out',category:'Meals',account:'BCA 730',amount:13500,desc:'Kebab (ditagih temen)'},
     {id:'t24',date:'2026-06-23',type:'Out',category:'Meals',account:'BCA 730',amount:59900,desc:'Beli rokok dan minuman'},
-    {id:'t25',date:'2026-06-23',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:2837444,desc:'Auto-debit KTA Xtra Dana (cicilan Rp2,637,444 + late charge Rp200,000)'}
+    {id:'t25',date:'2026-06-23',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:2837444,desc:'Auto-debit KTA Xtra Dana (cicilan Rp2,637,444 + late charge Rp200,000)'},
+    {id:'t26',date:'2026-06-23',type:'Out',category:'Meals',account:'CIMB Credit Card (MC Plat Syariah)',amount:31000,desc:'Warteg makan'}
   ],
   budgets: {
     'Daughter Needs':0,'Utilities & Household':0,'Transportation':700000,
@@ -526,8 +664,27 @@ const DEFAULT_STATE = {
 // ============================================================
 let S;
 function loadState() {
-  try { const d = localStorage.getItem('ricky_pfd_v2'); S = d ? JSON.parse(d) : JSON.parse(JSON.stringify(DEFAULT_STATE)); }
-  catch(e) { S = JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+  // Prefer data.js (canonical) — fall back to localStorage, then DEFAULT_STATE
+  const seed = window.DASHBOARD_DATA || DEFAULT_STATE;
+  try {
+    const stored = localStorage.getItem('ricky_pfd_v2');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // If data.js is newer than stored seed, use data.js
+      if (!parsed._seedDate || parsed._seedDate < seed.lastUpdated) {
+        S = JSON.parse(JSON.stringify(seed));
+        S._seedDate = seed.lastUpdated;
+      } else {
+        S = parsed;
+      }
+    } else {
+      S = JSON.parse(JSON.stringify(seed));
+      S._seedDate = seed.lastUpdated;
+    }
+  } catch(e) {
+    S = JSON.parse(JSON.stringify(seed));
+    S._seedDate = seed.lastUpdated;
+  }
 }
 function saveState() {
   S.lastUpdated = new Date().toISOString().split('T')[0];
@@ -662,7 +819,7 @@ function renderDashboard() {
 
   document.getElementById('cash-bank-list').innerHTML = S.banks.map(b=>`
     <div class="metric-row">
-      <div><div class="metric-name">${b.name} <span style="color:var(--muted);font-size:12px">${b.nick}</span></div>
+      <div><div class="metric-name">${b.name} <span class="badge ${b.cat==='Digital Bank'?'badge-blue':b.cat==='eWallet'?'badge-green':'badge-gray'}" style="font-size:10px;padding:1px 6px">${b.cat||'Bank'}</span></div>
       <div style="font-size:11px;color:var(--muted)">${b.acct}</div></div>
       <div class="metric-value ${b.balance<0?'neg':''}">${fmtFull(b.balance)}</div>
     </div>`).join('') +
@@ -718,7 +875,7 @@ function renderAssets() {
     <div class="card"><div class="card-title">Investment Portfolio</div><div class="card-value">${fmtFull(c.totalInvest)}</div><div class="card-sub">P&L: <span class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</span></div></div>`;
 
   document.getElementById('bank-table').innerHTML = S.banks.map(b=>`
-    <tr><td>${b.name}</td><td>${b.nick}</td><td><span class="badge badge-gray">${b.type}</span></td>
+    <tr><td>${b.name}</td><td style="color:var(--muted);font-size:12px">${b.acct}</td><td><span class="badge ${b.cat==='Digital Bank'?'badge-blue':b.cat==='eWallet'?'badge-green':'badge-gray'}">${b.cat||'Bank'}</span></td>
     <td style="text-align:right" class="${b.balance<0?'neg':''}">${fmtFull(b.balance)}</td>
     <td style="color:var(--muted);font-size:12px">${b.updated}</td></tr>`)
     .join('') + `<tr class="tr-total"><td colspan="3">Total Cash</td><td style="text-align:right">${fmtFull(c.totalCash)}</td><td></td></tr>`;
@@ -880,7 +1037,7 @@ function renderBudget() {
 // ============================================================
 function renderDispatch() {
   document.getElementById('bank-balance-inputs').innerHTML = S.banks.map((b,i)=>`
-    <div class="form-group"><label>${b.name} — ${b.nick}</label>
+    <div class="form-group"><label>${b.name} ${b.acct}</label>
       <input type="number" id="bbal-${i}" value="${b.balance}" step="0.01"></div>`).join('');
 
   document.getElementById('cc-balance-inputs').innerHTML = S.creditCards.map((cc,i)=>`
@@ -1026,12 +1183,118 @@ function toast(msg, type='green') {
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
+
+// ============================================================
+// EXPORT data.js
+// ============================================================
+function generateDataJs() {
+  const d = JSON.parse(JSON.stringify(S));
+  delete d._seedDate;
+  d.lastUpdated = new Date().toISOString().split('T')[0];
+  const tr = d.transactions.map((t,i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    {id:'${t.id}',date:'${t.date}',type:'${t.type}',category:'${t.category}',account:'${t.account}',amount:${t.amount},desc:'${(t.desc||'').replace(/'/g,"\'")}'}${c}`;
+  }).join('\n');
+  const bk = d.banks.map((b,i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    { name:'${b.name}', nick:'${b.nick}', cat:'${b.cat||"Bank"}', type:'${b.type}', balance:${b.balance}, updated:'${b.updated}', acct:'${b.acct}' }${c}`;
+  }).join('\n');
+  const cc = d.creditCards.map((x,i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    { name:'${x.name}', issuer:'${x.issuer}', limit:${x.limit}, outstanding:${x.outstanding}, dueDate:'${x.dueDate}', notes:'${(x.notes||'').replace(/'/g,"\'")}' }${c}`;
+  }).join('\n');
+  const ln = d.loans.map((l,i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    { type:'${l.type}', lender:'${l.lender}', remaining:${l.remaining}, monthly:${l.monthly}, rate:${l.rate}, tenor:${l.tenor} }${c}`;
+  }).join('\n');
+  const iv = d.investments.map((v,i,a)=>{
+    const c=i<a.length-1?',':'';
+    const nb=v.nbvOverride?`, nbvOverride:${v.nbvOverride}`:'';
+    const lu=v.lastUpdate?`, lastUpdate:'${v.lastUpdate}'`:'';
+    return `    { platform:'${v.platform}', ticker:'${v.ticker||''}', type:'${v.type}', qty:${v.qty||0}, avgBuy:${v.avgBuy||0}, currency:'${v.currency}', costBasis:${v.costBasis||0}, currentPrice:${v.currentPrice||0}${nb}${lu} }${c}`;
+  }).join('\n');
+  const bg = Object.entries(d.budgets).map(([k,v],i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    '${k}':${v}${c}`;
+  }).join('\n');
+  return `// RICKY FINANCE DASHBOARD — Data File
+// Last updated: ${d.lastUpdated}
+
+window.DASHBOARD_DATA = {
+  fxRate: ${d.fxRate},
+  lastUpdated: '${d.lastUpdated}',
+  banks: [
+${bk}
+  ],
+  creditCards: [
+${cc}
+  ],
+  loans: [
+${ln}
+  ],
+  investments: [
+${iv}
+  ],
+  transactions: [
+${tr}
+  ],
+  budgets: {
+${bg}
+  },
+  income: { salary:${d.income.salary||0}, kprMonthly:${d.income.kprMonthly||0} }
+}
+`;
+}
+function exportDataJs() {
+  const blob = new Blob([generateDataJs()],{type:'text/javascript'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'data.js'; a.click();
+  document.getElementById('export-hint').textContent = '✅ Download selesai — replace data.js di folder project, lalu refresh browser.';
+  toast('data.js didownload!');
+}
+function copyDataJs() {
+  navigator.clipboard.writeText(generateDataJs()).then(()=>{
+    document.getElementById('export-hint').textContent = '✅ Konten data.js di-copy — paste ke file data.js di folder project.';
+    toast('Copied ke clipboard!');
+  });
+}
+
 // ============================================================
 // INIT
 // ============================================================
 loadState();
 populateFilters();
 renderAll();
+
+// ============================================================
+// AUTO PRICE UPDATE (reads prices.json, loops every 6 hours)
+// ============================================================
+async function autoUpdatePrices() {
+  try {
+    const resp = await fetch('prices.json?t=' + Date.now());
+    if (!resp.ok) return;
+    const p = await resp.json();
+    let changed = false;
+
+    S.investments.forEach(inv => {
+      if (inv.ticker === 'VOO'  && p.VOO)    { inv.currentPrice = p.VOO;    changed = true; }
+      if (inv.ticker === 'BBRI' && p.BBRI)   { inv.currentPrice = p.BBRI;   changed = true; }
+    });
+    if (p.USDIDR && p.USDIDR > 0) { S.fxRate = Math.round(p.USDIDR); changed = true; }
+
+    if (changed) {
+      if (p.updated) S.lastUpdated = p.updated.substring(0, 10) + ' (auto)';
+      saveState();
+      renderAll();
+      console.log('[AutoPrice] updated:', p.updated);
+    }
+  } catch(e) {
+    console.log('[AutoPrice] skipped (offline / local):', e.message);
+  }
+}
+
+autoUpdatePrices();
+setInterval(autoUpdatePrices, 6 * 60 * 60 * 1000);
+
 </script>
 </body>
 </html>
