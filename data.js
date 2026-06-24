@@ -9,7 +9,7 @@ window.DASHBOARD_DATA = {
   lastUpdated: '2026-06-24',
   banks: [
     { name:'Blu By BCA', nick:'blu by BCA', cat:'Digital Bank', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
-    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:4825375.14, updated:'2026-06-24', acct:'****5062' },
+    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:325375.14, updated:'2026-06-24', acct:'****5062' },
     { name:'BCA', nick:'m-Info Acct 2 (245)', cat:'Bank', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
     { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:17050000.52, updated:'2026-06-24', acct:'****4829' },
     { name:'CIMB Niaga', nick:'Auto-debit KTA', cat:'Bank', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'****4200' }
@@ -57,7 +57,7 @@ window.DASHBOARD_DATA = {
     {id:'t25',date:'2026-06-23',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:2837444,desc:'Auto-debit KTA Xtra Dana (cicilan Rp2,637,444 + late charge Rp200,000)'},
     {id:'t26',date:'2026-06-23',type:'Out',category:'Meals',account:'CIMB Credit Card (MC Plat Syariah)',amount:31000,desc:'Warteg makan'},
     {id:'t27',date:'2026-06-24',type:'In',category:'Income - Other',account:'BCA 730',amount:4822619,desc:'VOO ETF Pluang - withdraw settled ke BCA 7305025062. Selling price 4,827,614 → net settled 4,822,619 (forex gap 4,995). Realized loss vs modal Rp177,381.'},
-    {id:'t28',date:'2026-06-24',type:'In',category:'Income - Other',account:'Permata 412 (Payroll)',amount:4500000,desc:'Intercash masuk ke Permata 829'},
+    {id:'t28',date:'2026-06-24',type:'Transfer',category:'Transfer Internal',account:'BCA 730 -> Permata 829',amount:4500000,desc:'Intercash BCA 7305025062 ke Permata 829 (via intercash service)'},
     {id:'t29',date:'2026-06-24',type:'Out',category:'Biaya Admin/Fee',account:'BCA 730',amount:2500,desc:'Admin fee intercash ke Permata 829'},
     {id:'t30',date:'2026-06-24',type:'Out',category:'Pembayaran Utang/Cicilan',account:'Permata 412 (Payroll)',amount:2360448,desc:'Bayar tagihan CC Permata Cashback Card (****9447)'},
     {id:'t31',date:'2026-06-24',type:'Out',category:'Biaya Admin/Fee',account:'Permata 412 (Payroll)',amount:50000,desc:'Fee/denda bayar CC Permata'},
