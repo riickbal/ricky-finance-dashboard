@@ -16,7 +16,7 @@ window.DASHBOARD_DATA = {
   ],
   creditCards: [
     { name:'MC Plat. Syariah Bundling', issuer:'CIMB Niaga Syariah', limit:59200000, outstanding:20236890.33, dueDate:'', notes:'Rp3,098,486 PENDING REFUND (raket padel Tokopedia dibatalkan). Available limit belum dipulihkan.' },
-    { name:'Permata Cashback Card', issuer:'Permata', limit:10000000, outstanding:18330612.15, dueDate:'', notes:'Acct ****9447. Sudah bayar 2,360,448 (24 Jun) + beli Mac Mini M4 13,116,500 (24 Jun). Outstanding melebihi limit — perlu pelunasan segera.' }
+    { name:'Permata Cashback Card', issuer:'Permata', limit:20500000, outstanding:20466500, dueDate:'', notes:'Acct ****9447. Limit sementara Rp20,500,000 s/d 8 Agu 2026 (normal Rp10,000,000). Outstanding prev 9,760,477.93 + Mac Mini 13,116,500 - bayar 2,360,448 = ~20,466,500. Available limit: Rp33,500.' }
   ],
   loans: [
     { type:'KPR', lender:'Permata', remaining:1128658676, monthly:0, rate:0, tenor:0 },
