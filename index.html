@@ -765,24 +765,19 @@ function renderDashboard() {
   document.getElementById('nw-liabilities').textContent = fmtFull(c.totalLiab);
   document.getElementById('nw-invest').textContent = fmtFull(c.totalInvest);
 
-  // Investment P&L card
-  const totalPnl = c.investments.reduce((a,inv)=>{
-    const cost = (inv.qty||0)*(inv.costBasis||0);
-    const curr = inv.nbv||0;
-    return a + (curr - cost);
-  }, 0);
+  // Investment P&L card — use c.totalPL from computed() which correctly does nbv - costBasis
+  const totalPnl = c.totalPL;
   const pnlEl = document.getElementById('nw-invest-pnl');
   pnlEl.textContent = (totalPnl>=0?'+':'')+fmtFull(totalPnl);
   pnlEl.className = 'nw-value '+(totalPnl>=0?'pos':'neg');
 
-  const activeInv = c.investments.filter(inv=>(inv.qty||0)>0||(inv.nbv||0)>0);
+  const activeInv = c.investments.filter(inv=>(inv.costBasis||0)>0||(inv.nbv||0)>0);
   document.getElementById('nw-invest-breakdown').innerHTML = activeInv.length===0
     ? '<div class="nw-meta-item"><div class="nw-meta-label" style="color:var(--muted)">Belum ada data investasi</div></div>'
     : activeInv.slice(0,4).map(inv=>{
-        const cost = (inv.qty||0)*(inv.costBasis||0);
-        const curr = inv.nbv||0;
-        const pnl = curr - cost;
-        const pnlPct = cost>0 ? pnl/cost : 0;
+        // inv.pl & inv.plPct already computed correctly in computed()
+        const pnl = inv.pl||0;
+        const pnlPct = inv.plPct||0;
         return `<div class="nw-meta-item">
           <div class="nw-meta-label">${inv.ticker||inv.name} <span style="font-size:10px;color:var(--muted)">${inv.platform||''}</span></div>
           <div class="nw-meta-value ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${fmtFull(pnl)} <span style="font-size:11px">(${pnlPct>=0?'+':''}${(pnlPct*100).toFixed(1)}%)</span></div>

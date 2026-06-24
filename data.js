@@ -1,22 +1,22 @@
 // ============================================================
 // RICKY FINANCE DASHBOARD — Data File
 // Edit this file (or let Claude edit it) then push to GitHub
-// Last updated: 2026-06-23
+// Last updated: 2026-06-24
 // ============================================================
 
 window.DASHBOARD_DATA = {
   fxRate: 17819,
-  lastUpdated: '2026-06-23',
+  lastUpdated: '2026-06-24',
   banks: [
     { name:'Blu By BCA', nick:'blu by BCA', cat:'Digital Bank', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
-    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:1054.14, updated:'2026-06-23', acct:'****5062' },
+    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:4825375.14, updated:'2026-06-24', acct:'****5062' },
     { name:'BCA', nick:'m-Info Acct 2 (245)', cat:'Bank', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
-    { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:16000000.52, updated:'2026-06-21', acct:'****4829' },
+    { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:17050000.52, updated:'2026-06-24', acct:'****4829' },
     { name:'CIMB Niaga', nick:'Auto-debit KTA', cat:'Bank', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'****4200' }
   ],
   creditCards: [
     { name:'MC Plat. Syariah Bundling', issuer:'CIMB Niaga Syariah', limit:59200000, outstanding:20236890.33, dueDate:'', notes:'Rp3,098,486 PENDING REFUND (raket padel Tokopedia dibatalkan). Available limit belum dipulihkan.' },
-    { name:'Permata Cashback Card', issuer:'Permata', limit:10000000, outstanding:7574560.15, dueDate:'', notes:'Acct ****9447' }
+    { name:'Permata Cashback Card', issuer:'Permata', limit:10000000, outstanding:18330612.15, dueDate:'', notes:'Acct ****9447. Sudah bayar 2,360,448 (24 Jun) + beli Mac Mini M4 13,116,500 (24 Jun). Outstanding melebihi limit — perlu pelunasan segera.' }
   ],
   loans: [
     { type:'KPR', lender:'Permata', remaining:1128658676, monthly:0, rate:0, tenor:0 },
@@ -26,7 +26,7 @@ window.DASHBOARD_DATA = {
     { platform:'Binance', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'USD', costBasis:0, currentPrice:0 },
     { platform:'Binance', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'USD', costBasis:0, currentPrice:0 },
     { platform:'Indodax', ticker:'', type:'Crypto', qty:0, avgBuy:0, currency:'IDR', costBasis:0, currentPrice:0 },
-    { platform:'Pluang', ticker:'VOO', type:'ETF (US Stock)', qty:0, avgBuy:0, currency:'USD', costBasis:5000000, currentPrice:0, nbvOverride:4925203, lastUpdate:'2026-06-20' },
+    { platform:'Pluang', ticker:'VOO', type:'ETF (US Stock)', qty:0, avgBuy:0, currency:'USD', costBasis:0, currentPrice:0, notes:'CLOSED 2026-06-24. Withdraw settled BCA 730. Realized loss Rp177,381 (modal 5jt, settled 4,822,619).' },
     { platform:'Stockbit', ticker:'BBRI', type:'Saham IDX', qty:0, avgBuy:0, currency:'IDR', costBasis:10000000, currentPrice:0, nbvOverride:9376000, lastUpdate:'2026-06-20' }
   ],
   transactions: [
@@ -56,6 +56,16 @@ window.DASHBOARD_DATA = {
     {id:'t24',date:'2026-06-23',type:'Out',category:'Meals',account:'BCA 730',amount:59900,desc:'Beli rokok dan minuman'},
     {id:'t25',date:'2026-06-23',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:2837444,desc:'Auto-debit KTA Xtra Dana (cicilan Rp2,637,444 + late charge Rp200,000)'},
     {id:'t26',date:'2026-06-23',type:'Out',category:'Meals',account:'CIMB Credit Card (MC Plat Syariah)',amount:31000,desc:'Warteg makan'},
+    {id:'t27',date:'2026-06-24',type:'In',category:'Income - Other',account:'BCA 730',amount:4822619,desc:'VOO ETF Pluang - withdraw settled ke BCA 7305025062. Selling price 4,827,614 → net settled 4,822,619 (forex gap 4,995). Realized loss vs modal Rp177,381.'},
+    {id:'t28',date:'2026-06-24',type:'In',category:'Income - Other',account:'Permata 412 (Payroll)',amount:4500000,desc:'Intercash masuk ke Permata 829'},
+    {id:'t29',date:'2026-06-24',type:'Out',category:'Biaya Admin/Fee',account:'BCA 730',amount:2500,desc:'Admin fee intercash ke Permata 829'},
+    {id:'t30',date:'2026-06-24',type:'Out',category:'Pembayaran Utang/Cicilan',account:'Permata 412 (Payroll)',amount:2360448,desc:'Bayar tagihan CC Permata Cashback Card (****9447)'},
+    {id:'t31',date:'2026-06-24',type:'Out',category:'Biaya Admin/Fee',account:'Permata 412 (Payroll)',amount:50000,desc:'Fee/denda bayar CC Permata'},
+    {id:'t32',date:'2026-06-24',type:'Out',category:'Shopping/Belanja Online',account:'Permata Cashback Card',amount:13116500,desc:'Purchase Mac Mini M4'},
+    {id:'t33',date:'2026-06-24',type:'Transfer',category:'Transfer Internal',account:'Permata -> BCA 730',amount:1039552,desc:'Transfer Permata 829 ke BCA 7305025062'},
+    {id:'t34',date:'2026-06-24',type:'Out',category:'Shopping/Belanja Online',account:'BCA 730',amount:900350,desc:'Kebutuhan support Mac Mini - Keyboard, HDMI, KVM, stop kontak ampere'},
+    {id:'t35',date:'2026-06-24',type:'Out',category:'Meals',account:'BCA 730',amount:27000,desc:'Warteg makan'},
+    {id:'t36',date:'2026-06-24',type:'Out',category:'Meals',account:'BCA 730',amount:108000,desc:'Kopi'},
   ],
   budgets: {
     'Daughter Needs':0,'Utilities & Household':0,'Transportation':700000,
