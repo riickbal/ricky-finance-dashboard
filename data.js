@@ -11,7 +11,7 @@ window.DASHBOARD_DATA = {
     { name:'Blu By BCA', nick:'blu by BCA', cat:'Digital Bank', type:'Tabungan (Digital)', balance:0.61, updated:'2026-06-20', acct:'****1904' },
     { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:325375.14, updated:'2026-06-24', acct:'****5062' },
     { name:'BCA', nick:'m-Info Acct 2 (245)', cat:'Bank', type:'Tabungan', balance:0.43, updated:'2026-06-20', acct:'****7968' },
-    { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:17050000.52, updated:'2026-06-24', acct:'****4829' },
+    { name:'Permata', nick:'Payroll Account', cat:'Bank', type:'Payroll/Giro', balance:17070000.52, updated:'2026-06-24', acct:'****4829' },
     { name:'CIMB Niaga', nick:'Auto-debit KTA', cat:'Bank', type:'Tabungan', balance:-146866, updated:'2026-06-23', acct:'****4200' }
   ],
   creditCards: [
@@ -66,6 +66,7 @@ window.DASHBOARD_DATA = {
     {id:'t34',date:'2026-06-24',type:'Out',category:'Shopping/Belanja Online',account:'BCA 730',amount:900350,desc:'Kebutuhan support Mac Mini - Keyboard, HDMI, KVM, stop kontak ampere'},
     {id:'t35',date:'2026-06-24',type:'Out',category:'Meals',account:'BCA 730',amount:27000,desc:'Warteg makan'},
     {id:'t36',date:'2026-06-24',type:'Out',category:'Meals',account:'BCA 730',amount:108000,desc:'Kopi'},
+    {id:'t37',date:'2026-06-24',type:'In',category:'Income - Other',account:'Permata 412 (Payroll)',amount:20000,desc:'Reimbursement parkir'},
   ],
   budgets: {
     'Daughter Needs':0,'Utilities & Household':0,'Transportation':700000,
