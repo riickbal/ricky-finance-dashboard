@@ -9,9 +9,9 @@ window.DASHBOARD_DATA = {
   lastUpdated: '2026-06-25',
   banks: [
     { name:'Blu By BCA', nick:'BLU 904', cat:'Digital Bank', type:'Tabungan (Digital)', balance:1500000.61, updated:'2026-06-25', acct:'****1904' },
-    { name:'BCA', nick:'BCA 062', cat:'Bank', type:'Tabungan', balance:2456229.14, updated:'2026-06-25', acct:'****5062' },
-    { name:'BCA', nick:'BCA 968', cat:'Bank', type:'Tabungan', balance:3365000.43, updated:'2026-06-25', acct:'****7968' },
-    { name:'Permata', nick:'Permata 829', cat:'Bank', type:'Payroll/Giro', balance:19687871.52, updated:'2026-06-25', acct:'****4829' },
+    { name:'BCA', nick:'BCA 062', cat:'Bank', type:'Tabungan', balance:1453229.14, updated:'2026-06-25', acct:'****5062' },
+    { name:'BCA', nick:'BCA 968', cat:'Bank', type:'Tabungan', balance:3650000.43, updated:'2026-06-25', acct:'****7968' },
+    { name:'Permata', nick:'Permata 829', cat:'Bank', type:'Payroll/Giro', balance:20405871.52, updated:'2026-06-25', acct:'****4829' },
     { name:'Permata', nick:'Permata 734', cat:'Bank', type:'Tabungan', balance:7414879, updated:'2026-06-25', acct:'****3734', notes:'Rekening KPR — auto-debit KPR Rp7,400,000 tiap tgl 7' },
     { name:'CIMB Niaga', nick:'CIMB 200', cat:'Bank', type:'Tabungan', balance:50000, updated:'2026-06-25', acct:'****4200' }
   ],
@@ -97,9 +97,9 @@ window.DASHBOARD_DATA = {
     {id:'t48',date:'2026-06-25',type:'Out',category:'Biaya Admin/Fee',account:'BCA 730',amount:1000,desc:'Admin variance belanja 25 Jun'},
     {id:'t49',date:'2026-06-25',type:'Out',category:'Subscription',account:'BCA 730',amount:350000,desc:'⚠️ Langganan Claude AI (29 Jun–28 Jul) — RECURRING tiap tgl 29 via BCA 730'},
     {id:'t50',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> BCA 730',amount:2353000,desc:'Transfer Permata 829 ke BCA 7305025062'},
-    {id:'t51',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> BCA 245',amount:3365000,desc:'Transfer Permata 829 ke BCA ****7968 (BCA 968)'},
-    {id:'t52',date:'2026-06-25',type:'Out',category:'Listrik',account:'Permata 412 (Payroll)',amount:1000000,desc:'Bayar tagihan listrik PLN'},
-    {id:'t53',date:'2026-06-25',type:'Out',category:'Biaya Admin/Fee',account:'Permata 412 (Payroll)',amount:3000,desc:'Admin bayar listrik PLN'},
+    {id:'t51',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> BCA 968',amount:3650000,desc:'Transfer Permata 829 ke BCA ****7968 (BCA 968)'},
+    {id:'t52',date:'2026-06-25',type:'Out',category:'Listrik',account:'BCA 062',amount:1000000,desc:'Bayar tagihan listrik PLN'},
+    {id:'t53',date:'2026-06-25',type:'Out',category:'Biaya Admin/Fee',account:'BCA 062',amount:3000,desc:'Admin bayar listrik PLN'},
   ],
   budgets: {
     'Daughter Needs':0,
