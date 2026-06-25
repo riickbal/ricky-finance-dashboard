@@ -153,6 +153,19 @@ tr:hover .del-btn{opacity:1;}
 
 @media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:repeat(2,1fr);}.g21{grid-template-columns:1fr;}.nw-value{font-size:26px;}}
 @media(max-width:600px){.g4,.g3,.g2,.g21{grid-template-columns:1fr;}.page{padding:16px;}.topbar{padding:0 12px;}.nav-tab{padding:12px 10px;font-size:11px;}}
+
+/* LANG TOGGLE */
+.lang-btn{padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;border:1px solid var(--border);color:var(--muted);background:transparent;transition:all .15s;font-family:inherit;}
+.lang-btn:hover{color:var(--text);}
+.lang-btn.lang-on{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* PERIOD / PACKAGE BAR */
+.period-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.period-pill{padding:4px 11px;border-radius:16px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);color:var(--muted);background:transparent;transition:all .15s;user-select:none;}
+.period-pill:hover{color:var(--text);border-color:var(--text);}
+.period-pill.pkg-on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.period-sep{width:1px;height:14px;background:var(--border);flex-shrink:0;}
+.period-bar select{max-width:110px;padding:4px 8px;font-size:12px;}
 </style>
 </head>
 <body>
@@ -170,9 +183,28 @@ tr:hover .del-btn{opacity:1;}
   </div>
   <div class="nav-right">
     <div class="nav-btn nav-master" onclick="showPage('master',this)">⚙️ Master</div>
-    <div class="nav-btn nav-catat" onclick="showPage('catat',this)">+ Catat</div>
+    <div class="nav-btn nav-catat" onclick="showPage('catat',this)" id="btn-catat">+ Catat</div>
+    <button class="lang-btn lang-on" id="lang-id" onclick="setLang('ID')">ID</button>
+    <button class="lang-btn" id="lang-en" onclick="setLang('EN')">EN</button>
   </div>
   <div class="topbar-right" id="lastUpdated">—</div>
+</div>
+
+<!-- PERIOD / PACKAGE FILTER BAR -->
+<div class="period-bar">
+  <span id="lbl-pkg" style="font-size:11px;font-weight:700;color:var(--muted);margin-right:4px">Periode:</span>
+  <div class="period-pill pkg-on" onclick="setPkg('all')" data-pkg="all" id="pkg-all">Semua</div>
+  <div class="period-sep"></div>
+  <div class="period-pill" onclick="setPkg('lm')" data-pkg="lm" id="pkg-lm">Last Month</div>
+  <div class="period-pill" onclick="setPkg('ly')" data-pkg="ly" id="pkg-ly">Last Year</div>
+  <div class="period-sep"></div>
+  <div class="period-pill" onclick="setPkg('q1')" data-pkg="q1" id="pkg-q1">Q1</div>
+  <div class="period-pill" onclick="setPkg('q2')" data-pkg="q2" id="pkg-q2">Q2</div>
+  <div class="period-pill" onclick="setPkg('q3')" data-pkg="q3" id="pkg-q3">Q3</div>
+  <div class="period-pill" onclick="setPkg('q4')" data-pkg="q4" id="pkg-q4">Q4</div>
+  <div style="flex:1"></div>
+  <select id="filter-year" onchange="onFilterChange()"></select>
+  <select id="filter-month" onchange="onFilterChange()"></select>
 </div>
 
 <!-- ===================== DASHBOARD ===================== -->
@@ -180,7 +212,7 @@ tr:hover .del-btn{opacity:1;}
   <div id="dash-alerts"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
     <div class="nw-card" style="margin-bottom:0">
-      <div class="nw-label">Net Worth</div>
+      <div class="nw-label" data-i18n="Net Worth">Net Worth</div>
       <div class="nw-value" id="nw-total">—</div>
       <div class="card-sub" style="margin-top:6px">Total Assets − Total Liabilities</div>
       <div class="nw-meta">
@@ -192,7 +224,7 @@ tr:hover .del-btn{opacity:1;}
       </div>
     </div>
     <div class="nw-card" style="margin-bottom:0;background:linear-gradient(135deg,#1a2535,#1e3040)">
-      <div class="nw-label">📈 Investment P&L</div>
+      <div class="nw-label" data-i18n="📈 Investment P&L">📈 Investment P&L</div>
       <div class="nw-value" id="nw-invest-pnl">—</div>
       <div class="card-sub" style="margin-top:6px">Unrealized gain/loss</div>
       <div class="nw-meta" id="nw-invest-breakdown"></div>
@@ -200,26 +232,26 @@ tr:hover .del-btn{opacity:1;}
   </div>
   <div class="g4">
     <div class="card">
-      <div class="card-title">Cash Flow (Bulan Ini)</div>
+      <div class="card-title" data-i18n="Cash Flow">Cash Flow (Bulan Ini)</div>
       <div class="card-value" id="kpi-cf">—</div>
       <div class="card-sub" id="kpi-cf-sub">—</div>
     </div>
     <div class="card">
-      <div class="card-title">DTI Ratio</div>
+      <div class="card-title" data-i18n="DTI Ratio">DTI Ratio</div>
       <div class="card-value" id="kpi-dti">—</div>
-      <div class="card-sub">Cicilan ÷ Net Income · batas &lt;30%</div>
+      <div class="card-sub" data-i18n="dti-sub">Cicilan ÷ Net Income · batas &lt;30%</div>
       <div class="prog-wrap"><div class="prog-bar" id="dti-bar" style="width:0%"></div></div>
     </div>
     <div class="card">
-      <div class="card-title">CC Utilization</div>
+      <div class="card-title" data-i18n="CC Utilization">CC Utilization</div>
       <div class="card-value" id="kpi-cc">—</div>
       <div class="card-sub" id="kpi-cc-sub">—</div>
       <div class="prog-wrap"><div class="prog-bar" id="cc-bar" style="width:0%"></div></div>
     </div>
     <div class="card">
-      <div class="card-title">Savings Rate</div>
+      <div class="card-title" data-i18n="Savings Rate">Savings Rate</div>
       <div class="card-value" id="kpi-sr">—</div>
-      <div class="card-sub">% income setelah op.expense</div>
+      <div class="card-sub" data-i18n="sr-sub">% income setelah op.expense</div>
       <div class="prog-wrap"><div class="prog-bar bar-green" id="sr-bar" style="width:0%"></div></div>
     </div>
   </div>
@@ -251,9 +283,8 @@ tr:hover .del-btn{opacity:1;}
 <!-- ===================== TRANSACTIONS ===================== -->
 <div class="page" id="page-transactions">
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <select id="trx-filter-month" onchange="renderTransactions()" style="max-width:150px"></select>
     <select id="trx-filter-type" onchange="renderTransactions()" style="max-width:140px">
-      <option value="">Semua Tipe</option>
+      <option value="" id="trx-type-all">Semua Tipe</option>
       <option>In</option><option>Out</option><option>Transfer</option><option>Accrual</option>
     </select>
     <select id="trx-filter-cat" onchange="renderTransactions()" style="max-width:200px"></select>
@@ -542,6 +573,169 @@ tr:hover .del-btn{opacity:1;}
 
 <script>
 // ============================================================
+// LANGUAGE
+// ============================================================
+let LANG = 'ID';
+const I18N = {
+  ID: {
+    'Dashboard':'Dashboard','Transactions':'Transaksi','Income':'Pemasukan',
+    'Expenses':'Pengeluaran','Assets':'Aset','Liabilities':'Kewajiban',
+    'Catat':'+ Catat',
+    'period-label':'Periode:','pkg-all':'Semua',
+    'Budget vs Actual':'Budget vs Aktual','Transaction Log':'Log Transaksi',
+    'Cash & Bank':'Kas & Bank','Investments':'Investasi','Fixed Assets':'Aset Tetap',
+    'Categories':'Kategori','Accounts':'Akun','Asset Registry':'Daftar Aset',
+    'Input Manual':'Input Manual','Update Data':'Update Data',
+    'Net Worth':'Kekayaan Bersih','📈 Investment P&L':'📈 Investasi P&L',
+    'Cash Flow':'Arus Kas (Bln Ini)','DTI Ratio':'Rasio DTI',
+    'dti-sub':'Cicilan ÷ Net Income · batas <30%',
+    'CC Utilization':'Utilisasi CC','Savings Rate':'Savings Rate',
+    'sr-sub':'% income setelah op.expense',
+    'all-years':'Semua Tahun','all-months':'Semua Bulan',
+    'trx-cat-all':'Semua Kategori','trx-acc-all':'Semua Akun',
+  },
+  EN: {
+    'Dashboard':'Dashboard','Transactions':'Transactions','Income':'Income',
+    'Expenses':'Expenses','Assets':'Assets','Liabilities':'Liabilities',
+    'Catat':'+ Record',
+    'period-label':'Period:','pkg-all':'All',
+    'Budget vs Actual':'Budget vs Actual','Transaction Log':'Transaction Log',
+    'Cash & Bank':'Cash & Bank','Investments':'Investments','Fixed Assets':'Fixed Assets',
+    'Categories':'Categories','Accounts':'Accounts','Asset Registry':'Asset Registry',
+    'Input Manual':'Manual Input','Update Data':'Update Data',
+    'Net Worth':'Net Worth','📈 Investment P&L':'📈 Investment P&L',
+    'Cash Flow':'Cash Flow (This Month)','DTI Ratio':'DTI Ratio',
+    'dti-sub':'Installments ÷ Net Income · threshold <30%',
+    'CC Utilization':'CC Utilization','Savings Rate':'Savings Rate',
+    'sr-sub':'% income after op.expenses',
+    'all-years':'All Years','all-months':'All Months',
+    'trx-cat-all':'All Categories','trx-acc-all':'All Accounts',
+  }
+};
+function t(key){ return (I18N[LANG] && I18N[LANG][key]) || key; }
+
+function setLang(l) {
+  LANG = l;
+  document.getElementById('lang-id').classList.toggle('lang-on', l==='ID');
+  document.getElementById('lang-en').classList.toggle('lang-on', l==='EN');
+  applyLang();
+  if(S) { populateFilterBar(); populateFilters(); renderAll(); }
+}
+
+function applyLang() {
+  // Nav tabs
+  const navTabs = document.querySelectorAll('.nav-tab');
+  const tabKeys = ['Dashboard','Transactions','Income','Expenses','Assets','Liabilities'];
+  navTabs.forEach((el,i)=>{ if(tabKeys[i]) el.textContent = t(tabKeys[i]); });
+  document.getElementById('btn-catat').textContent = t('Catat');
+  // Period bar
+  document.getElementById('lbl-pkg').textContent = t('period-label');
+  document.getElementById('pkg-all').textContent = t('pkg-all');
+  // Static i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  // Inner tabs — Expenses
+  const expInner = document.querySelectorAll('#page-expenses .inner-tab');
+  if(expInner[0]) expInner[0].textContent = t('Budget vs Actual');
+  if(expInner[1]) expInner[1].textContent = t('Transaction Log');
+  // Inner tabs — Assets
+  const assetInner = document.querySelectorAll('#page-assets .inner-tab');
+  if(assetInner[0]) assetInner[0].textContent = '💵 '+t('Cash & Bank');
+  if(assetInner[1]) assetInner[1].textContent = '📈 '+t('Investments');
+  if(assetInner[2]) assetInner[2].textContent = '🖥️ '+t('Fixed Assets');
+  // Inner tabs — Master
+  const masterInner = document.querySelectorAll('#page-master .inner-tab');
+  if(masterInner[0]) masterInner[0].textContent = '🗂️ '+t('Categories');
+  if(masterInner[1]) masterInner[1].textContent = '🏦 '+t('Accounts');
+  if(masterInner[2]) masterInner[2].textContent = '📋 '+t('Asset Registry');
+  // Inner tabs — Catat
+  const catatInner = document.querySelectorAll('#page-catat .inner-tab');
+  if(catatInner[0]) catatInner[0].textContent = '✏️ '+t('Input Manual');
+  if(catatInner[1]) catatInner[1].textContent = '🔄 '+t('Update Data');
+}
+
+// ============================================================
+// PERIOD / PACKAGE FILTER
+// ============================================================
+let activePkg = 'all';
+let activePage = 'dashboard';
+
+function periodMatch(period, dateStr) {
+  if(!period) return true;
+  if(period.length === 4) return dateStr.startsWith(period);
+  if(period.includes('-Q')) {
+    const [yr, q] = period.split('-');
+    const qm = {Q1:['01','02','03'],Q2:['04','05','06'],Q3:['07','08','09'],Q4:['10','11','12']};
+    return (qm[q]||[]).some(m => dateStr.startsWith(yr+'-'+m));
+  }
+  return dateStr.startsWith(period);
+}
+
+function getActivePeriod() {
+  const yrEl = document.getElementById('filter-year');
+  const moEl = document.getElementById('filter-month');
+  if(!yrEl||!moEl) return null;
+  const yr = yrEl.value, mo = moEl.value;
+  if(!yr || yr==='all') return null;
+  if(!mo || mo==='all') return yr;
+  return `${yr}-${mo}`;
+}
+
+function setPkg(pkg) {
+  activePkg = pkg;
+  document.querySelectorAll('.period-pill').forEach(p => p.classList.toggle('pkg-on', p.dataset.pkg===pkg));
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  const yrEl = document.getElementById('filter-year');
+  const moEl = document.getElementById('filter-month');
+  if(pkg==='all') { yrEl.value='all'; moEl.value='all'; }
+  else if(pkg==='lm') {
+    const d=new Date(y, m-1, 1);
+    yrEl.value=String(d.getFullYear());
+    moEl.value=String(d.getMonth()+1).padStart(2,'0');
+  }
+  else if(pkg==='ly') { yrEl.value=String(y-1); moEl.value='all'; }
+  else if(pkg==='q1') { yrEl.value=String(y); moEl.value='Q1'; }
+  else if(pkg==='q2') { yrEl.value=String(y); moEl.value='Q2'; }
+  else if(pkg==='q3') { yrEl.value=String(y); moEl.value='Q3'; }
+  else if(pkg==='q4') { yrEl.value=String(y); moEl.value='Q4'; }
+  renderActivePage();
+}
+
+function onFilterChange() {
+  activePkg = 'custom';
+  document.querySelectorAll('.period-pill').forEach(p => p.classList.remove('pkg-on'));
+  renderActivePage();
+}
+
+function renderActivePage() {
+  switch(activePage) {
+    case 'dashboard':     renderDashboard(); break;
+    case 'transactions':  renderTransactions(); break;
+    case 'income':        renderIncome(); break;
+    case 'expenses':      renderExpenses(); break;
+    case 'assets':        renderAssets(); break;
+    case 'liabilities':   renderLiabilities(); break;
+  }
+}
+
+function populateFilterBar() {
+  if(!S) return;
+  const years=[...new Set(S.transactions.map(t=>t.date.substring(0,4)))].sort().reverse();
+  const cy=String(new Date().getFullYear());
+  if(!years.includes(cy)) years.unshift(cy);
+  const yrEl=document.getElementById('filter-year');
+  yrEl.innerHTML=`<option value="all">${t('all-years')}</option>`+years.map(y=>`<option value="${y}"${y===cy?' selected':''}>${y}</option>`).join('');
+
+  const moNamesID=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const moNamesEN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const moNames = LANG==='ID' ? moNamesID : moNamesEN;
+  const cm=String(new Date().getMonth()+1).padStart(2,'0');
+  const moEl=document.getElementById('filter-month');
+  moEl.innerHTML=`<option value="all">${t('all-months')}</option>`+
+    `<optgroup label="Quarter"><option value="Q1">Q1 (Jan–Mar)</option><option value="Q2">Q2 (Apr–Jun)</option><option value="Q3">Q3 (Jul–Sep)</option><option value="Q4">Q4 (Oct–Des)</option></optgroup>`+
+    `<optgroup label="Month">`+moNames.map((n,i)=>{const v=String(i+1).padStart(2,'0');return`<option value="${v}"${v===cm?' selected':''}>${v} · ${n}</option>`;}).join('')+`</optgroup>`;
+}
+
+// ============================================================
 // CONSTANTS — Balance sheet categories (NOT expense)
 // ============================================================
 const NON_EXPENSE_CATS = new Set([
@@ -627,7 +821,8 @@ function computed() {
 
   const now = new Date();
   const cm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const thisMo = S.transactions.filter(t=>t.date.startsWith(cm));
+  const _period = (typeof getActivePeriod === 'function') ? getActivePeriod() : null;
+  const thisMo = _period ? S.transactions.filter(t=>periodMatch(_period,t.date)) : S.transactions.filter(t=>t.date.startsWith(cm));
 
   const totalIn = thisMo.filter(t=>t.type==='In').reduce((a,b)=>a+b.amount,0);
   const totalCashOut = thisMo.filter(t=>t.type==='Out'||t.type==='Accrual').reduce((a,b)=>a+b.amount,0);
@@ -751,12 +946,12 @@ function renderDashboard() {
 // RENDER TRANSACTIONS
 // ============================================================
 function renderTransactions() {
-  const fm = document.getElementById('trx-filter-month').value;
+  const period = getActivePeriod();
   const ft = document.getElementById('trx-filter-type').value;
   const fc = document.getElementById('trx-filter-cat').value;
   const fa = document.getElementById('trx-filter-acc').value;
   let trx = [...S.transactions].sort((a,b)=>b.date.localeCompare(a.date));
-  if(fm) trx=trx.filter(t=>t.date.startsWith(fm));
+  if(period) trx=trx.filter(t=>periodMatch(period, t.date));
   if(ft) trx=trx.filter(t=>t.type===ft);
   if(fc) trx=trx.filter(t=>t.category===fc);
   if(fa) trx=trx.filter(t=>t.account===fa);
@@ -1068,13 +1263,10 @@ function updateCatByType() {
 // POPULATE FILTERS
 // ============================================================
 function populateFilters() {
-  const months=[...new Set(S.transactions.map(t=>t.date.substring(0,7)))].sort().reverse();
-  const curr=new Date().toISOString().substring(0,7);
-  document.getElementById('trx-filter-month').innerHTML='<option value="">Semua Bulan</option>'+months.map(m=>`<option value="${m}"${m===curr?' selected':''}>${m}</option>`).join('');
-  const cats=[...new Set(S.transactions.map(t=>t.category))].sort();
-  document.getElementById('trx-filter-cat').innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option>${c}</option>`).join('');
-  const accs=[...new Set(S.transactions.map(t=>t.account))].sort();
-  document.getElementById('trx-filter-acc').innerHTML='<option value="">Semua Account</option>'+accs.map(a=>`<option>${a}</option>`).join('');
+  const cats=[...new Set(S.transactions.map(tx=>tx.category))].sort();
+  document.getElementById('trx-filter-cat').innerHTML=`<option value="">${t('trx-cat-all')}</option>`+cats.map(c=>`<option>${c}</option>`).join('');
+  const accs=[...new Set(S.transactions.map(tx=>tx.account))].sort();
+  document.getElementById('trx-filter-acc').innerHTML=`<option value="">${t('trx-acc-all')}</option>`+accs.map(a=>`<option>${a}</option>`).join('');
 }
 
 // ============================================================
@@ -1157,10 +1349,12 @@ function renderAll() {
 // NAVIGATION
 // ============================================================
 function showPage(page, el) {
+  activePage = page;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab,.nav-btn').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   if(el) el.classList.add('active');
+  renderActivePage();
 }
 
 function showInner(page, panel, el) {
@@ -1195,6 +1389,8 @@ function updatePrices() {
 function initDashboard() {
   loadState();
   populateFilters();
+  populateFilterBar();
+  applyLang();
   renderAll();
   updatePrices();
   setInterval(updatePrices, 6*60*60*1000);
