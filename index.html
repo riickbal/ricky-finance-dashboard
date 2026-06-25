@@ -594,14 +594,12 @@
 
 <div id="toast"></div>
 
-<!-- Load canonical data — cache-busted by lastUpdated date -->
-<script src="data.js?v=20260625"></script>
-
 <script>
 // ============================================================
-// DEFAULT STATE (seeded from Excel)
+// DATA SOURCE: data.js only — no localStorage, no hardcoded fallback
+// Loaded dynamically with Date.now() cache buster (see bottom of script)
 // ============================================================
-const DEFAULT_STATE = {
+const DEFAULT_STATE = { // kept only as error fallback — never used in normal flow
   fxRate: 17819,
   lastUpdated: '2026-06-23',
   banks: [
@@ -664,36 +662,16 @@ const DEFAULT_STATE = {
 };
 
 // ============================================================
-// STATE
+// STATE — always from data.js, no localStorage
 // ============================================================
 let S;
 function loadState() {
-  // Prefer data.js (canonical) — fall back to localStorage, then DEFAULT_STATE
-  const seed = window.DASHBOARD_DATA || DEFAULT_STATE;
-  try {
-    const stored = localStorage.getItem('ricky_pfd_v3');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // If data.js is newer than stored seed, use data.js
-      if (!parsed._seedDate || parsed._seedDate < seed.lastUpdated) {
-        S = JSON.parse(JSON.stringify(seed));
-        S._seedDate = seed.lastUpdated;
-      } else {
-        S = parsed;
-      }
-    } else {
-      S = JSON.parse(JSON.stringify(seed));
-      S._seedDate = seed.lastUpdated;
-    }
-  } catch(e) {
-    S = JSON.parse(JSON.stringify(seed));
-    S._seedDate = seed.lastUpdated;
-  }
+  // data.js loaded dynamically (see bottom) — window.DASHBOARD_DATA is always set
+  S = JSON.parse(JSON.stringify(window.DASHBOARD_DATA || DEFAULT_STATE));
 }
 function saveState() {
-  S.lastUpdated = new Date().toISOString().split('T')[0];
-  localStorage.setItem('ricky_pfd_v3', JSON.stringify(S));
-  document.getElementById('lastUpdated').textContent = 'Updated: ' + S.lastUpdated;
+  // No localStorage — data persisted via Claude editing data.js + GitHub push
+  document.getElementById('lastUpdated').textContent = 'Updated: ' + (S.lastUpdated || '—');
 }
 
 // ============================================================
