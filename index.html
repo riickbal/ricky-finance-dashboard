@@ -172,6 +172,7 @@
         <div class="nw-meta-item"><div class="nw-meta-label">Total Assets</div><div class="nw-meta-value pos" id="nw-assets">—</div></div>
         <div class="nw-meta-item"><div class="nw-meta-label">Total Liabilities</div><div class="nw-meta-value neg" id="nw-liabilities">—</div></div>
         <div class="nw-meta-item"><div class="nw-meta-label">Investment Portfolio</div><div class="nw-meta-value" id="nw-invest">—</div></div>
+        <div class="nw-meta-item"><div class="nw-meta-label">Fixed Assets (BV)</div><div class="nw-meta-value" id="nw-fixed-assets">—</div></div>
       </div>
     </div>
     <div class="nw-card" style="margin-bottom:0;background:linear-gradient(135deg,#1a2535,#1e3040)">
@@ -422,16 +423,39 @@
       </div>
       <div class="form-group"><label>Kategori</label>
         <select id="d-category">
-          <option>Income - Salary</option><option>Income - Other</option>
-          <option>Daughter Needs</option>
-          <option>Listrik</option><option>Wifi &amp; Internet</option>
-          <option>Utilities &amp; Household</option>
-          <option>Transportation</option><option>Service Vehicle</option>
-          <option>Meals</option><option>Phone Credit</option>
-          <option>Subscription</option><option>Wellness (Hobbies &amp; Travel)</option>
-          <option>Shopping/Belanja Online</option><option>Pembayaran Utang/Cicilan</option>
-          <option>Biaya Admin/Fee</option><option>Transfer Internal</option>
-          <option>Lain-lain / Belum Jelas</option>
+          <optgroup label="── INCOME ──">
+            <option>Income - Salary</option><option>Income - Other</option>
+          </optgroup>
+          <optgroup label="── FAMILY ──">
+            <option>Family - Diapers &amp; Essentials</option>
+            <option>Family - Nutrition</option>
+            <option>Family - Toys &amp; Education</option>
+            <option>Family - Health</option>
+          </optgroup>
+          <optgroup label="── LIVING ──">
+            <option>Meals</option><option>Listrik</option><option>Wifi &amp; Internet</option>
+            <option>Transportation</option><option>Service Vehicle</option><option>Phone Credit</option>
+          </optgroup>
+          <optgroup label="── LIFESTYLE ──">
+            <option>Wellness (Hobbies &amp; Travel)</option><option>Subscription</option>
+          </optgroup>
+          <optgroup label="── SHOPPING ──">
+            <option>Electronics &amp; Accessories</option><option>Marketplace / Other</option>
+          </optgroup>
+          <optgroup label="── FINANCIAL EXPENSE ──">
+            <option>Interest Expense - KTA</option><option>Interest Expense - KPR</option>
+            <option>Biaya Admin/Fee</option>
+          </optgroup>
+          <optgroup label="── BALANCE SHEET (bukan expense) ──">
+            <option>Fixed Asset Purchase</option>
+            <option>Liability Payment - CC</option>
+            <option>Liability Payment - KTA</option>
+            <option>Liability Payment - KPR</option>
+            <option>Transfer Internal</option>
+          </optgroup>
+          <optgroup label="── OTHER ──">
+            <option>Lain-lain / Belum Jelas</option>
+          </optgroup>
         </select>
       </div>
       <div class="form-group"><label>Account / Metode</label>
@@ -537,7 +561,7 @@
 
 <!-- ASSETS -->
 <div class="page" id="page-assets">
-  <div class="grid-3" id="assets-kpi"></div>
+  <div class="grid-4" id="assets-kpi"></div>
   <div class="grid-2">
     <div class="card">
       <div class="card-title">Bank Accounts</div>
@@ -550,6 +574,20 @@
       <div class="card-title">Asset Summary</div>
       <div id="asset-summary-list"></div>
     </div>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <div class="card-title">🖥️ Fixed Assets (Aset Tetap) — Depreciation 48 Bulan</div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Aset</th><th>Kategori</th><th>Tgl Beli</th>
+        <th style="text-align:right">Harga Beli</th>
+        <th style="text-align:right">Dep/Bln</th>
+        <th style="text-align:right">Akum. Dep</th>
+        <th style="text-align:right">Book Value</th>
+        <th>Sisa</th>
+      </tr></thead>
+      <tbody id="fixed-assets-table"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -624,6 +662,7 @@ const DEFAULT_STATE = { // kept only as error fallback — never used in normal 
     { platform:'Pluang', ticker:'VOO', type:'ETF (US Stock)', qty:0, avgBuy:0, currency:'USD', costBasis:5000000, currentPrice:0, nbvOverride:4925203, lastUpdate:'2026-06-20' },
     { platform:'Stockbit', ticker:'BBRI', type:'Saham IDX', qty:0, avgBuy:0, currency:'IDR', costBasis:10000000, currentPrice:0, nbvOverride:9376000, lastUpdate:'2026-06-20' }
   ],
+  fixedAssets: [],
   transactions: [
     {id:'t1',date:'2026-06-20',type:'Transfer',category:'Transfer Internal',account:'Permata -> BCA 730',amount:500000,desc:'Transfer internal Permata ke BCA 7305025062'},
     {id:'t2',date:'2026-06-20',type:'Out',category:'Transportation',account:'CIMB Credit Card (MC Plat Syariah)',amount:272200,desc:'SPBU 34.158.04 KSO Curug, Tangerang'},
@@ -695,6 +734,12 @@ const cv = (n,inv=false) => (!n||n===0)?'':(inv?n<0:n>0)?'pos':'neg';
 // ============================================================
 // COMPUTED
 // ============================================================
+// Categories that are balance-sheet movements — NOT operational expenses
+const NON_EXPENSE_CATS = new Set([
+  'Fixed Asset Purchase','Liability Payment - CC',
+  'Liability Payment - KTA','Liability Payment - KPR','Transfer Internal'
+]);
+
 function computed() {
   const totalCash = S.banks.reduce((a,b)=>a+b.balance,0);
   const investments = S.investments.map(inv => {
@@ -703,14 +748,30 @@ function computed() {
       sharesNbv = inv.currency==='USD' ? inv.qty*inv.currentPrice*S.fxRate : inv.qty*inv.currentPrice;
     } else if (inv.nbvOverride) sharesNbv = inv.nbvOverride;
     const cash = inv.platformCash || 0;
-    const nbv = sharesNbv + cash; // total value at platform incl. idle cash
-    const pl = sharesNbv - inv.costBasis; // P&L on investment only, excl. idle cash
+    const nbv = sharesNbv + cash;
+    const pl = sharesNbv - inv.costBasis;
     return {...inv, nbv, sharesNbv, pl, plPct: inv.costBasis>0?pl/inv.costBasis:0};
   });
   const totalInvest = investments.reduce((a,b)=>a+(b.nbv||0),0);
   const totalCostBasis = investments.reduce((a,b)=>a+(b.costBasis||0),0);
   const totalPL = investments.reduce((a,b)=>a+(b.pl||0),0);
-  const totalAssets = totalCash + totalInvest;
+
+  // Fixed Assets — book value & depreciation
+  const refDate = new Date(S.lastUpdated || new Date().toISOString().split('T')[0]);
+  const fixedAssetsComputed = (S.fixedAssets || []).map(fa => {
+    const purchDate = new Date(fa.purchaseDate);
+    const monthsElapsed = (refDate.getFullYear()-purchDate.getFullYear())*12
+      + (refDate.getMonth()-purchDate.getMonth()) + 1; // include purchase month
+    const monthlyDep = fa.cost / fa.usefulLifeMonths;
+    const accumulatedDep = Math.min(monthsElapsed * monthlyDep, fa.cost);
+    const bookValue = Math.max(fa.cost - accumulatedDep, 0);
+    const remainingMonths = Math.max(fa.usefulLifeMonths - monthsElapsed, 0);
+    return {...fa, monthsElapsed, monthlyDep, accumulatedDep, bookValue, remainingMonths};
+  });
+  const totalFixedAssets = fixedAssetsComputed.reduce((a,b)=>a+b.bookValue, 0);
+  const currentMonthDep = fixedAssetsComputed.reduce((a,b)=>a+b.monthlyDep, 0);
+
+  const totalAssets = totalCash + totalInvest + totalFixedAssets;
   const totalCC = S.creditCards.reduce((a,b)=>a+b.outstanding,0);
   const totalCCLimit = S.creditCards.reduce((a,b)=>a+b.limit,0);
   const totalLoans = S.loans.reduce((a,b)=>a+b.remaining,0);
@@ -721,8 +782,11 @@ function computed() {
   const cm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const thisMo = S.transactions.filter(t=>t.date.startsWith(cm));
   const totalIn = thisMo.filter(t=>t.type==='In').reduce((a,b)=>a+b.amount,0);
-  const totalOut = thisMo.filter(t=>t.type==='Out').reduce((a,b)=>a+b.amount,0);
-  const netCF = totalIn - totalOut;
+  const totalCashOut = thisMo.filter(t=>t.type==='Out').reduce((a,b)=>a+b.amount,0);
+  // Operational expenses only (excludes balance-sheet movements)
+  const opExpTrx = thisMo.filter(t=>t.type==='Out' && !NON_EXPENSE_CATS.has(t.category));
+  const totalOut = opExpTrx.reduce((a,b)=>a+b.amount, 0);
+  const netCF = totalIn - totalCashOut; // actual cash change
 
   const totalMonthlyInstall = S.loans.reduce((a,b)=>a+(b.monthly||0),0) + (S.income.kprMonthly||0);
   const salary = S.income.salary||0;
@@ -731,11 +795,13 @@ function computed() {
   const savingsRate = salary>0?(salary-totalOut)/salary:null;
 
   const expByCat = {};
-  thisMo.filter(t=>t.type==='Out').forEach(t=>{ expByCat[t.category]=(expByCat[t.category]||0)+t.amount; });
+  opExpTrx.forEach(t=>{ expByCat[t.category]=(expByCat[t.category]||0)+t.amount; });
 
-  return { totalCash,investments,totalInvest,totalCostBasis,totalPL,totalAssets,
-    totalCC,totalCCLimit,totalLoans,totalLiab,netWorth,totalIn,totalOut,netCF,
-    totalMonthlyInstall,salary,dti,ccUtil,savingsRate,expByCat };
+  return { totalCash, investments, totalInvest, totalCostBasis, totalPL,
+    fixedAssetsComputed, totalFixedAssets, currentMonthDep,
+    totalAssets, totalCC, totalCCLimit, totalLoans, totalLiab, netWorth,
+    totalIn, totalOut, totalCashOut, netCF,
+    totalMonthlyInstall, salary, dti, ccUtil, savingsRate, expByCat };
 }
 
 // ============================================================
@@ -749,6 +815,7 @@ function renderDashboard() {
   document.getElementById('nw-assets').textContent = fmtFull(c.totalAssets);
   document.getElementById('nw-liabilities').textContent = fmtFull(c.totalLiab);
   document.getElementById('nw-invest').textContent = fmtFull(c.totalInvest);
+  document.getElementById('nw-fixed-assets').textContent = fmtFull(c.totalFixedAssets);
 
   // Investment P&L card — use c.totalPL from computed() which correctly does nbv - costBasis
   const totalPnl = c.totalPL;
@@ -772,7 +839,7 @@ function renderDashboard() {
   const cfEl = document.getElementById('kpi-cashflow');
   cfEl.textContent = fmtFull(c.netCF);
   cfEl.className = 'card-value '+(c.netCF>=0?'pos':'neg');
-  document.getElementById('kpi-cashflow-sub').textContent = `In: ${fmtFull(c.totalIn)} | Out: ${fmtFull(c.totalOut)}`;
+  document.getElementById('kpi-cashflow-sub').textContent = `In: ${fmtFull(c.totalIn)} | All Out: ${fmtFull(c.totalCashOut)} | Op.Exp: ${fmtFull(c.totalOut)}`;
 
   const dtiEl = document.getElementById('kpi-dti');
   if(c.dti!==null) {
@@ -803,7 +870,8 @@ function renderDashboard() {
     {label:'Cash', value:c.totalCash, color:'#4f7cff'},
     {label:'Crypto (Binance + Indodax)', value:c.investments.filter(i=>i.type==='Crypto').reduce((a,b)=>a+(b.nbv||0),0), color:'#f59e0b'},
     {label:'Saham IDX (Stockbit)', value:c.investments.filter(i=>i.type==='Saham IDX').reduce((a,b)=>a+(b.nbv||0),0), color:'#22c55e'},
-    {label:'ETF / Pluang', value:c.investments.filter(i=>i.type.includes('ETF')||i.platform==='Pluang').reduce((a,b)=>a+(b.nbv||0),0), color:'#a855f7'}
+    {label:'ETF / Pluang', value:c.investments.filter(i=>i.type.includes('ETF')||i.platform==='Pluang').reduce((a,b)=>a+(b.nbv||0),0), color:'#a855f7'},
+    {label:'Fixed Assets (Book Value)', value:c.totalFixedAssets, color:'#14b8a6'}
   ];
   document.getElementById('asset-alloc-table').innerHTML = cats.map(cat=>{
     const p=c.totalAssets>0?cat.value/c.totalAssets:0;
@@ -868,9 +936,10 @@ function renderDashboard() {
 function renderAssets() {
   const c=computed();
   document.getElementById('assets-kpi').innerHTML = `
-    <div class="card"><div class="card-title">Total Assets</div><div class="card-value pos">${fmtFull(c.totalAssets)}</div><div class="card-sub">Cash + Investments NBV</div></div>
+    <div class="card"><div class="card-title">Total Assets</div><div class="card-value pos">${fmtFull(c.totalAssets)}</div><div class="card-sub">Cash + Investasi + Fixed Assets (BV)</div></div>
     <div class="card"><div class="card-title">Total Cash</div><div class="card-value">${fmtFull(c.totalCash)}</div><div class="card-sub">${S.banks.length} rekening bank</div></div>
-    <div class="card"><div class="card-title">Investment Portfolio</div><div class="card-value">${fmtFull(c.totalInvest)}</div><div class="card-sub">P&L: <span class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</span></div></div>`;
+    <div class="card"><div class="card-title">Investment Portfolio</div><div class="card-value">${fmtFull(c.totalInvest)}</div><div class="card-sub">P&L: <span class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</span></div></div>
+    <div class="card"><div class="card-title">Fixed Assets (Book Value)</div><div class="card-value">${fmtFull(c.totalFixedAssets)}</div><div class="card-sub">Dep/bln: ${fmtFull(c.currentMonthDep)}</div></div>`;
 
   document.getElementById('bank-table').innerHTML = S.banks.map(b=>`
     <tr><td>${b.name}</td><td style="color:var(--muted);font-size:12px">${b.acct}</td><td><span class="badge ${b.cat==='Digital Bank'?'badge-blue':b.cat==='eWallet'?'badge-green':'badge-gray'}">${b.cat||'Bank'}</span></td>
@@ -888,7 +957,33 @@ function renderAssets() {
         <div class="metric-value">${fmtFull(i.nbv)}</div>
         <div style="font-size:11px" class="${cv(i.pl)}">${i.pl>=0?'+':''}${fmtFull(i.pl)}</div>
       </div></div>`).join('') +
+    c.fixedAssetsComputed.map(fa=>`
+    <div class="metric-row"><div>
+      <div class="metric-name">🖥️ ${fa.name}</div>
+      <div style="font-size:11px;color:var(--muted)">${fa.category} · dep ${fa.monthsElapsed} bln</div></div>
+      <div style="text-align:right">
+        <div class="metric-value">${fmtFull(fa.bookValue)}</div>
+        <div style="font-size:11px;color:var(--muted)">Rp${Math.round(fa.monthlyDep).toLocaleString('id-ID')}/bln</div>
+      </div></div>`).join('') +
     `<div class="metric-row"><div class="metric-name" style="font-weight:700">Total Assets</div><div class="metric-value pos">${fmtFull(c.totalAssets)}</div></div>`;
+
+  // Fixed Assets table
+  const faTableEl = document.getElementById('fixed-assets-table');
+  if(faTableEl) faTableEl.innerHTML = c.fixedAssetsComputed.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Belum ada fixed asset</td></tr>'
+    : c.fixedAssetsComputed.map(fa=>`<tr>
+        <td style="font-weight:600">${fa.name}</td>
+        <td><span class="badge badge-blue">${fa.category}</span></td>
+        <td style="color:var(--muted);font-size:12px">${fa.purchaseDate}</td>
+        <td style="text-align:right">${fmtFull(fa.cost)}</td>
+        <td style="text-align:right;color:var(--muted)">${fmtFull(fa.monthlyDep)}</td>
+        <td style="text-align:right;color:var(--red)">${fmtFull(fa.accumulatedDep)}</td>
+        <td style="text-align:right;font-weight:700">${fmtFull(fa.bookValue)}</td>
+        <td style="color:var(--muted);font-size:12px">${fa.remainingMonths} bln</td>
+      </tr>`).join('') +
+      `<tr class="tr-total"><td colspan="3">Total Fixed Assets</td><td style="text-align:right">${fmtFull(c.fixedAssetsComputed.reduce((a,b)=>a+b.cost,0))}</td><td></td>
+        <td style="text-align:right;color:var(--red)">${fmtFull(c.fixedAssetsComputed.reduce((a,b)=>a+b.accumulatedDep,0))}</td>
+        <td style="text-align:right">${fmtFull(c.totalFixedAssets)}</td><td></td></tr>`;
 }
 
 // ============================================================
@@ -1008,9 +1103,10 @@ function renderBudget() {
   const c=computed();
   const tOut=Object.values(c.expByCat).reduce((a,b)=>a+b,0);
   document.getElementById('budget-kpi-row').innerHTML = `
-    <div class="card"><div class="card-title">Total Income Actual</div><div class="card-value pos">${fmtFull(c.totalIn)}</div></div>
-    <div class="card"><div class="card-title">Total Expense Actual</div><div class="card-value neg">${fmtFull(tOut)}</div></div>
-    <div class="card"><div class="card-title">Sisa (REST)</div><div class="card-value ${c.totalIn-tOut>=0?'pos':'neg'}">${fmtFull(c.totalIn-tOut)}</div></div>`;
+    <div class="card"><div class="card-title">Total Income</div><div class="card-value pos">${fmtFull(c.totalIn)}</div></div>
+    <div class="card"><div class="card-title">Operational Expense</div><div class="card-value neg">${fmtFull(tOut)}</div><div class="card-sub">Diluar dep, liability pay, asset purchase</div></div>
+    <div class="card"><div class="card-title">Depreciation (Bln Ini)</div><div class="card-value" style="color:var(--yellow)">${fmtFull(c.currentMonthDep)}</div><div class="card-sub">${(c.fixedAssetsComputed||[]).map(fa=>fa.name).join(', ')||'—'}</div></div>
+    <div class="card"><div class="card-title">Net (Excl. Dep)</div><div class="card-value ${c.totalIn-tOut>=0?'pos':'neg'}">${fmtFull(c.totalIn-tOut)}</div><div class="card-sub">Incl. dep: ${fmtFull(c.totalIn-tOut-c.currentMonthDep)}</div></div>`;
 
   const allCats=Object.keys(S.budgets);
   const clrs2=['#4f7cff','#f59e0b','#22c55e','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#64748b','#8b5cf6','#06b6d4','#d946ef'];
@@ -1027,7 +1123,21 @@ function renderBudget() {
         ${budget>0?` <span class="badge ${pu>1?'badge-red':pu>0.8?'badge-yellow':'badge-green'}">${pct(pu)}</span>`:''}
       </span></div>
       ${budget>0?`<div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(pu,1)*100}%;background:${bc}"></div></div>`:''}</div>`;
-  }).join('');
+  }).join('') +
+  // Depreciation block — separate from operational
+  (c.currentMonthDep > 0 ? `
+  <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
+    <div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📉 DEPRECIATION EXPENSE</div>
+    ${(c.fixedAssetsComputed||[]).map((fa,i)=>`
+    <div class="budget-row"><div class="budget-row-head">
+      <span><span class="cat-dot" style="background:#14b8a6"></span>${fa.name}</span>
+      <span style="color:var(--muted);font-size:12px">${fmtFull(fa.monthlyDep)}/bln · BV ${fmtFull(fa.bookValue)} · sisa ${fa.remainingMonths} bln</span>
+    </div></div>`).join('')}
+    <div class="budget-row"><div class="budget-row-head">
+      <span style="font-weight:700">Total Depreciation</span>
+      <span style="font-size:13px;font-weight:700;color:var(--yellow)">${fmtFull(c.currentMonthDep)}</span>
+    </div></div>
+  </div>` : '');
 
   document.getElementById('budget-edit-form').innerHTML = '<div class="form-grid">' +
     allCats.map(cat=>`
@@ -1215,7 +1325,12 @@ function generateDataJs() {
     const c=i<a.length-1?',':'';
     const nb=v.nbvOverride?`, nbvOverride:${v.nbvOverride}`:'';
     const lu=v.lastUpdate?`, lastUpdate:'${v.lastUpdate}'`:'';
-    return `    { platform:'${v.platform}', ticker:'${v.ticker||''}', type:'${v.type}', qty:${v.qty||0}, avgBuy:${v.avgBuy||0}, currency:'${v.currency}', costBasis:${v.costBasis||0}, currentPrice:${v.currentPrice||0}${nb}${lu} }${c}`;
+    const pc=v.platformCash?`, platformCash:${v.platformCash}`:'';
+    return `    { platform:'${v.platform}', ticker:'${v.ticker||''}', type:'${v.type}', qty:${v.qty||0}, avgBuy:${v.avgBuy||0}, currency:'${v.currency}', costBasis:${v.costBasis||0}, currentPrice:${v.currentPrice||0}${nb}${pc}${lu} }${c}`;
+  }).join('\n');
+  const fa = (d.fixedAssets||[]).map((f,i,a)=>{
+    const c=i<a.length-1?',':'';
+    return `    { id:'${f.id}', name:'${f.name}', category:'${f.category}', purchaseDate:'${f.purchaseDate}', cost:${f.cost}, usefulLifeMonths:${f.usefulLifeMonths}, transactionRef:'${f.transactionRef||''}', notes:'${(f.notes||'').replace(/'/g,"\\'")}' }${c}`;
   }).join('\n');
   const bg = Object.entries(d.budgets).map(([k,v],i,a)=>{
     const c=i<a.length-1?',':'';
@@ -1238,6 +1353,9 @@ ${ln}
   ],
   investments: [
 ${iv}
+  ],
+  fixedAssets: [
+${fa}
   ],
   transactions: [
 ${tr}
