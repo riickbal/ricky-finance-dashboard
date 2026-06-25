@@ -423,7 +423,9 @@
       <div class="form-group"><label>Kategori</label>
         <select id="d-category">
           <option>Income - Salary</option><option>Income - Other</option>
-          <option>Daughter Needs</option><option>Utilities &amp; Household</option>
+          <option>Daughter Needs</option>
+          <option>Listrik</option><option>Wifi &amp; Internet</option>
+          <option>Utilities &amp; Household</option>
           <option>Transportation</option><option>Service Vehicle</option>
           <option>Meals</option><option>Phone Credit</option>
           <option>Subscription</option><option>Wellness (Hobbies &amp; Travel)</option>
@@ -434,8 +436,8 @@
       </div>
       <div class="form-group"><label>Account / Metode</label>
         <select id="d-account">
-          <option>BCA 002 (blu)</option><option>BCA 730</option><option>BCA 245</option>
-          <option>Permata 412 (Payroll)</option><option>CIMB 707</option>
+          <option>BCA 002 (blu)</option><option>BCA 730</option><option>BCA 245</option><option>BCA 928</option>
+          <option>Permata 412 (Payroll)</option><option>Permata 734 (KPR)</option><option>CIMB 707</option>
           <option>CIMB Credit Card (MC Plat Syariah)</option><option>Permata Cashback Card</option>
         </select>
       </div>
@@ -580,7 +582,7 @@
     <div class="card-title">Portfolio Detail</div>
     <div class="table-wrap"><table>
       <thead><tr>
-        <th>Platform</th><th>Asset</th><th>Tipe</th><th>Qty</th>
+        <th>Platform</th><th>Asset</th><th>Tipe</th><th>Lot/Qty</th><th style="text-align:right">Avg Buy</th>
         <th style="text-align:right">Cost Basis</th><th style="text-align:right">Curr. Price</th>
         <th style="text-align:right">NBV (IDR)</th><th style="text-align:right">P&amp;L (IDR)</th>
         <th style="text-align:right">P&amp;L %</th><th style="text-align:right">% Port.</th>
@@ -715,12 +717,14 @@ const cv = (n,inv=false) => (!n||n===0)?'':(inv?n<0:n>0)?'pos':'neg';
 function computed() {
   const totalCash = S.banks.reduce((a,b)=>a+b.balance,0);
   const investments = S.investments.map(inv => {
-    let nbv = 0;
+    let sharesNbv = 0;
     if (inv.currentPrice > 0) {
-      nbv = inv.currency==='USD' ? inv.qty*inv.currentPrice*S.fxRate : inv.qty*inv.currentPrice;
-    } else if (inv.nbvOverride) nbv = inv.nbvOverride;
-    const pl = nbv - inv.costBasis;
-    return {...inv, nbv, pl, plPct: inv.costBasis>0?pl/inv.costBasis:0};
+      sharesNbv = inv.currency==='USD' ? inv.qty*inv.currentPrice*S.fxRate : inv.qty*inv.currentPrice;
+    } else if (inv.nbvOverride) sharesNbv = inv.nbvOverride;
+    const cash = inv.platformCash || 0;
+    const nbv = sharesNbv + cash; // total value at platform incl. idle cash
+    const pl = sharesNbv - inv.costBasis; // P&L on investment only, excl. idle cash
+    return {...inv, nbv, sharesNbv, pl, plPct: inv.costBasis>0?pl/inv.costBasis:0};
   });
   const totalInvest = investments.reduce((a,b)=>a+(b.nbv||0),0);
   const totalCostBasis = investments.reduce((a,b)=>a+(b.costBasis||0),0);
@@ -957,20 +961,26 @@ function renderInvestments() {
 
   document.getElementById('invest-table').innerHTML = c.investments.map(inv=>{
     if(inv.costBasis===0&&!inv.nbvOverride&&inv.qty===0)
-      return `<tr style="opacity:.4"><td>${inv.platform}</td><td>${inv.ticker||'<i style="color:var(--muted)">kosong</i>'}</td><td>${inv.type}</td><td colspan="7" style="color:var(--muted);font-style:italic">Belum ada data — isi via Dispatch</td></tr>`;
-    const portPct=c.totalInvest>0?inv.nbv/c.totalInvest:0;
+      return `<tr style="opacity:.4"><td>${inv.platform}</td><td>${inv.ticker||'<i style="color:var(--muted)">kosong</i>'}</td><td>${inv.type}</td><td colspan="9" style="color:var(--muted);font-style:italic">Belum ada data — isi via Dispatch</td></tr>`;
+    const portPct = c.totalInvest>0?inv.nbv/c.totalInvest:0;
+    const isIDX = inv.type==='Saham IDX';
+    const lotDisplay = isIDX ? (Math.round(inv.qty/100))+' lot' : (inv.qty>0?inv.qty:'—');
+    const avgBuyDisplay = inv.avgBuy>0 ? (inv.currency==='USD'?'$'+inv.avgBuy.toFixed(2):fmtFull(inv.avgBuy)) : '—';
+    const priceDisplay = inv.currentPrice>0?(inv.currency==='USD'?'$'+inv.currentPrice.toFixed(2):fmtFull(inv.currentPrice)):'<span style="color:var(--muted)">—</span>';
+    const cashRow = inv.platformCash>0 ? `<tr style="opacity:.55;font-size:12px"><td></td><td colspan="2" style="color:var(--muted);padding-left:16px">↳ Cash idle di ${inv.platform}</td><td colspan="4"></td><td style="text-align:right;color:var(--muted)">${fmtFull(inv.platformCash)}</td><td colspan="3"></td></tr>` : '';
     return `<tr>
       <td><span class="badge badge-blue">${inv.platform}</span></td>
       <td style="font-weight:600">${inv.ticker||'—'}</td><td>${inv.type}</td>
-      <td>${inv.qty||'—'}</td>
+      <td>${lotDisplay}</td>
+      <td style="text-align:right">${avgBuyDisplay}</td>
       <td style="text-align:right">${fmtFull(inv.costBasis)}</td>
-      <td style="text-align:right">${inv.currentPrice>0?(inv.currency==='USD'?'$'+inv.currentPrice.toFixed(2):fmtFull(inv.currentPrice)):'<span style="color:var(--muted)">—</span>'}</td>
-      <td style="text-align:right;font-weight:600">${fmtFull(inv.nbv)}</td>
+      <td style="text-align:right">${priceDisplay}</td>
+      <td style="text-align:right;font-weight:600">${fmtFull(inv.sharesNbv)}</td>
       <td style="text-align:right" class="${cv(inv.pl)}">${inv.pl>=0?'+':''}${fmtFull(inv.pl)}</td>
       <td style="text-align:right" class="${cv(inv.plPct)}">${inv.costBasis>0?pct(inv.plPct):'—'}</td>
-      <td style="text-align:right">${pct(portPct)}</td></tr>`;
+      <td style="text-align:right">${pct(portPct)}</td></tr>${cashRow}`;
   }).join('') + `<tr class="tr-total">
-    <td colspan="4">TOTAL</td>
+    <td colspan="5">TOTAL</td>
     <td style="text-align:right">${fmtFull(c.totalCostBasis)}</td><td></td>
     <td style="text-align:right">${fmtFull(c.totalInvest)}</td>
     <td style="text-align:right" class="${cv(c.totalPL)}">${c.totalPL>=0?'+':''}${fmtFull(c.totalPL)}</td>
