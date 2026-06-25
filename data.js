@@ -8,12 +8,12 @@ window.DASHBOARD_DATA = {
   fxRate: 17950,
   lastUpdated: '2026-06-25',
   banks: [
-    { name:'Blu By BCA', nick:'blu by BCA (budget padel)', cat:'Digital Bank', type:'Tabungan (Digital)', balance:1500000.61, updated:'2026-06-25', acct:'****1904' },
-    { name:'BCA', nick:'m-Info Acct 1 (730)', cat:'Bank', type:'Tabungan', balance:2456229.14, updated:'2026-06-25', acct:'****5062' },
-    { name:'BCA', nick:'m-Info Acct 2 (245/968)', cat:'Bank', type:'Tabungan', balance:3365000.43, updated:'2026-06-25', acct:'****7968' },
-    { name:'Permata', nick:'Payroll Account (829)', cat:'Bank', type:'Payroll/Giro', balance:19687871.52, updated:'2026-06-25', acct:'****4829' },
-    { name:'Permata', nick:'KPR Account (734)', cat:'Bank', type:'Tabungan', balance:7414879, updated:'2026-06-25', acct:'****3734', notes:'Rekening KPR — auto-debit KPR Rp7,400,000 tiap tgl 7' },
-    { name:'CIMB Niaga', nick:'Auto-debit KTA', cat:'Bank', type:'Tabungan', balance:50000, updated:'2026-06-25', acct:'****4200' }
+    { name:'Blu By BCA', nick:'BLU 904', cat:'Digital Bank', type:'Tabungan (Digital)', balance:1500000.61, updated:'2026-06-25', acct:'****1904' },
+    { name:'BCA', nick:'BCA 062', cat:'Bank', type:'Tabungan', balance:2456229.14, updated:'2026-06-25', acct:'****5062' },
+    { name:'BCA', nick:'BCA 968', cat:'Bank', type:'Tabungan', balance:3365000.43, updated:'2026-06-25', acct:'****7968' },
+    { name:'Permata', nick:'Permata 829', cat:'Bank', type:'Payroll/Giro', balance:19687871.52, updated:'2026-06-25', acct:'****4829' },
+    { name:'Permata', nick:'Permata 734', cat:'Bank', type:'Tabungan', balance:7414879, updated:'2026-06-25', acct:'****3734', notes:'Rekening KPR — auto-debit KPR Rp7,400,000 tiap tgl 7' },
+    { name:'CIMB Niaga', nick:'CIMB 200', cat:'Bank', type:'Tabungan', balance:50000, updated:'2026-06-25', acct:'****4200' }
   ],
   creditCards: [
     { name:'MC Plat. Syariah Bundling', issuer:'CIMB Niaga Syariah', limit:59200000, outstanding:16638270.33, dueDate:'', notes:'Refund raket padel Rp3,098,486 sudah balik (25 Jun). Bayar cicilan Rp500,134 (25 Jun). Available limit Rp42,561,729.67.' },
@@ -86,8 +86,8 @@ window.DASHBOARD_DATA = {
     // --- Jun 25 ---
     {id:'t38',date:'2026-06-25',type:'In',category:'Income - Salary',account:'Permata 412 (Payroll)',amount:20685871,desc:'Gaji dari PT Esensi Solusi Buana'},
     {id:'t39',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> Permata 734',amount:7400000,desc:'Transfer KPR — ke Permata 9839913734 (auto-debit KPR tgl 7 tiap bulan)'},
-    {id:'t40',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> CIMB 707',amount:697000,desc:'Top-up CIMB 707 untuk cover bayar cicilan CC CIMB'},
-    {id:'t41',date:'2026-06-25',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 707',amount:500134,desc:'Bayar cicilan CC CIMB Plat Syariah'},
+    {id:'t40',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> CIMB 200',amount:697000,desc:'Top-up CIMB 200 untuk cover bayar cicilan CC CIMB'},
+    {id:'t41',date:'2026-06-25',type:'Out',category:'Pembayaran Utang/Cicilan',account:'CIMB 200',amount:500134,desc:'Bayar cicilan CC CIMB Plat Syariah'},
     {id:'t42',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> BLU 904',amount:1500000,desc:'Budget padel — transfer ke BLU ****1904 (budget only, belum realisasi padel)'},
     {id:'t43',date:'2026-06-25',type:'Transfer',category:'Transfer Internal',account:'Permata 829 -> BCA 730',amount:1750000,desc:'Transfer Permata 829 ke BCA 7305025062'},
     {id:'t44',date:'2026-06-25',type:'Out',category:'Daughter Needs',account:'BCA 730',amount:77510,desc:'Mainan anak'},
