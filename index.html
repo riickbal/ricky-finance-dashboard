@@ -671,7 +671,7 @@ function loadState() {
   // Prefer data.js (canonical) — fall back to localStorage, then DEFAULT_STATE
   const seed = window.DASHBOARD_DATA || DEFAULT_STATE;
   try {
-    const stored = localStorage.getItem('ricky_pfd_v2');
+    const stored = localStorage.getItem('ricky_pfd_v3');
     if (stored) {
       const parsed = JSON.parse(stored);
       // If data.js is newer than stored seed, use data.js
@@ -692,7 +692,7 @@ function loadState() {
 }
 function saveState() {
   S.lastUpdated = new Date().toISOString().split('T')[0];
-  localStorage.setItem('ricky_pfd_v2', JSON.stringify(S));
+  localStorage.setItem('ricky_pfd_v3', JSON.stringify(S));
   document.getElementById('lastUpdated').textContent = 'Updated: ' + S.lastUpdated;
 }
 
