@@ -41,7 +41,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 FINANCE_URL  = "http://localhost:3000"
-MODEL        = "qwen3:latest"
+MODEL        = "qwen2.5:7b"
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
@@ -876,7 +876,7 @@ def chat_with_ollama(messages: list) -> str:
             "messages": current,
             "tools": TOOLS,
             "stream": False,
-            "options": {"think": False, "num_ctx": 4096, "num_predict": 1024}
+            "options": {"num_ctx": 8192, "num_predict": 1024, "temperature": 0.3}
         }
         resp = requests.post(OLLAMA_URL, json=payload, timeout=120)
         resp.raise_for_status()
@@ -1206,11 +1206,12 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         add_msg(uid, "assistant", response)
 
-        # Edit placeholder with real response
+        # Edit placeholder with real response — plain text, no parse_mode
         try:
-            await placeholder.edit_text(response, parse_mode="Markdown")
-        except Exception:
             await placeholder.edit_text(response)
+        except Exception as e:
+            logger.error(f"edit_text error: {e}")
+            await placeholder.edit_text(str(response)[:4000])
 
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
