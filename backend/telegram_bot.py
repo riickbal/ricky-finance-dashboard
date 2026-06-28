@@ -779,8 +779,6 @@ TOOL_GROUPS = {
     "compound":       _rw("get_banks", "get_transactions", "get_summary"),
     "all_write":      _tools(*_WRITE_CORE),
     "all":            TOOLS,
-    # Memory tools ditambahkan ke semua group via _rw — save_memory always available
-}
 }
 
 # ============================================================
@@ -1539,16 +1537,15 @@ def execute_tool(name: str, args: dict) -> str:
             amount=_num(args.get("amount")) if args.get("amount") is not None else None,
             desc=args.get("desc")
         )
+    elif name == "save_memory":
+        _save_memory_entry(args.get("key", ""), args.get("value", ""))
+        result = json.dumps({"success": True, "saved": args.get("key")})
+        logger.info(f"🧠 Memory saved: {args.get('key')} = {args.get('value')[:60]}")
+    elif name == "get_memory":
+        mem = _load_memory()
+        result = json.dumps({"memory": mem, "count": len(mem)}, ensure_ascii=False)
     else:
-        elif name == "save_memory":
-            _save_memory_entry(args.get("key", ""), args.get("value", ""))
-            result = json.dumps({"success": True, "saved": args.get("key")})
-            logger.info(f"🧠 Memory saved: {args.get('key')} = {args.get('value')[:60]}")
-        elif name == "get_memory":
-            mem = _load_memory()
-            result = json.dumps({"memory": mem, "count": len(mem)}, ensure_ascii=False)
-        else:
-            result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
+        result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
 
     # Semua hasil dilewatkan ke error enricher → friendly context kalau ada error
     return _enrich_error(result, name, args)
