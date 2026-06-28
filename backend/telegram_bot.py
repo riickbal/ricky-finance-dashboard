@@ -44,9 +44,9 @@ GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 FINANCE_URL  = "http://localhost:3000"
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Model routing
-MODEL_FAST    = "meta-llama/llama-4-scout-17b-16e-instruct"  # fast + smart (MoE, replaces 8B)
-MODEL_SMART   = "llama-3.3-70b-versatile"                    # complex analysis, write ops
+# Model routing — Groq-native models, optimized for their infra
+MODEL_FAST    = "groq/compound-mini"  # Groq-native, fast, great instruction following
+MODEL_SMART   = "groq/compound"       # Groq-native, smart, write ops + complex analysis
 
 # ============================================================
 # ROUTING: model + tool group per intent
@@ -97,9 +97,9 @@ INTENT_RULES = [
     # -------------------------------------------------------
     # 5. FINANCE READ
     # -------------------------------------------------------
+    (["update saldo", "koreksi saldo", "set saldo"],                 MODEL_FAST,  "bank_rw"),
     (["saldo", "rekening", "duit di bank", "terdiri dari",
-      "rincian rekening", "per bank", "breakdown bank",
-      "update saldo"],                                               MODEL_FAST,  "bank"),
+      "rincian rekening", "per bank", "breakdown bank"],            MODEL_FAST,  "bank"),
     ([" cc ", "kartu kredit", "credit card", "tagihan cc",
       "due date", "limit cc", "outstanding cc", "utilization cc",
       "bayar cc", "cicilan cc"],                                     MODEL_FAST,  "cc"),
@@ -334,11 +334,34 @@ Siap diproses — gas?
 
 # FORMAT
 - Angka: Rp 15,000,000 (bukan 15000000)
-- Saldo rekening → SELALU tabel dengan kolom: Nick | Saldo — jangan bullet list
-- Tabel untuk semua list >2 item
+- Tabel untuk semua list >2 item — WAJIB, bukan bullet point
 - Jangan pernah bilang "Perlu diingat bahwa saldo ini mungkin berubah" — ga perlu disclaimer
 - Error → jangan tampil JSON mentah, jelasin: apa yang gagal + solusinya
-- Selalu pakai field `nick` dari data (BLU 904, BCA 062, Permata 829) — jangan rekonstruksi nama sendiri"""
+
+# NAMA REKENING — CRITICAL
+Data rekening dari get_banks HANYA punya field "nick". Gunakan HANYA itu.
+DILARANG KERAS pakai nama seperti: BCA Digital, Blu by BCA, BCA (Digital), CIMB Niaga, Bank Permata.
+WAJIB pakai persis field nick yang ada di data: BLU 904, BCA 062, BCA 968, CIMB 200, Permata 734, dll.
+
+Contoh output BENAR untuk saldo:
+```
+Total saldo lo: Rp 29,707,365
+
+| Nick | Saldo |
+|------|-------|
+| BLU 904 | Rp 1,355,000 |
+| BCA 062 | Rp 878,600 |
+| BCA 968 | Rp 3,350,000 |
+| Permata 829 | Rp 15,000,000 |
+| Permata 734 | Rp 7,264,879 |
+| CIMB 200 | Rp 50,000 |
+| Permata 598 | Rp 1,808,885 |
+```
+
+Contoh output SALAH (jangan pernah):
+- BCA (Digital): Rp ...
+- CIMB Niaga: Rp ...
+- Blu by BCA: Rp ..."""
 
 SYSTEM_PROMPT = BASE_SYSTEM_PROMPT  # alias for compatibility
 
@@ -784,9 +807,11 @@ TOOL_GROUPS = {
     "market_ta":      _tools("get_market_data", "get_crypto_prices"),
     "market_news":    _tools("get_news"),
 
-    # FINANCE groups — semua include write core
-    "bank":           _rw("get_banks", "update_bank_balance"),
-    "bank_summary":   _rw("get_banks", "get_summary"),
+    # bank READ-ONLY — saldo query ga perlu write tools, ga trigger auto-upgrade ke heavy model
+    "bank":           _tools("get_banks"),
+    # bank + write — hanya untuk "update saldo" eksplisit
+    "bank_rw":        _rw("get_banks", "update_bank_balance"),
+    "bank_summary":   _tools("get_banks", "get_summary"),
     "cc":             _rw("get_credit_cards"),
     "loan":           _rw("get_loans"),
     "budget":         _rw("get_budgets"),
