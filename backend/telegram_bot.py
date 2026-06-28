@@ -20,6 +20,14 @@ Run:
 """
 
 import os, json, logging, requests, subprocess
+from pathlib import Path as _Path
+# Load .env dari folder backend
+_env_file = _Path(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        if "=" in _line and not _line.startswith("#"):
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 import datetime as dt
 from datetime import date
 from pathlib import Path
@@ -30,7 +38,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ============================================================
 # CONFIG
 # ============================================================
-BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "8271171170:AAEjzBhJ1PX02mLSaP9lC7ZG18wJtzoERZQ")
+BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 FINANCE_URL  = "http://localhost:3000"
 MODEL        = "qwen3:latest"
