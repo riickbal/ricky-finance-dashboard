@@ -896,9 +896,10 @@ def chat_with_ollama(messages: list) -> str:
     return "Maaf, terlalu banyak iterasi tool call."
 
 # ============================================================
-# CONVERSATION HISTORY
+# CONVERSATION HISTORY & SUBSCRIBERS
 # ============================================================
-histories: dict = {}
+histories:   dict = {}
+subscribers: dict = {}  # uid -> chat_id
 
 def get_history(uid: int) -> list:
     return histories.setdefault(uid, [])
