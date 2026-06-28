@@ -334,8 +334,11 @@ Siap diproses — gas?
 
 # FORMAT
 - Angka: Rp 15,000,000 (bukan 15000000)
-- Tabel kalau ada perbandingan atau list >3 item
-- Error → jangan tampil JSON mentah, jelasin: apa yang gagal + solusinya"""
+- Saldo rekening → SELALU tabel dengan kolom: Nick | Saldo — jangan bullet list
+- Tabel untuk semua list >2 item
+- Jangan pernah bilang "Perlu diingat bahwa saldo ini mungkin berubah" — ga perlu disclaimer
+- Error → jangan tampil JSON mentah, jelasin: apa yang gagal + solusinya
+- Selalu pakai field `nick` dari data (BLU 904, BCA 062, Permata 829) — jangan rekonstruksi nama sendiri"""
 
 SYSTEM_PROMPT = BASE_SYSTEM_PROMPT  # alias for compatibility
 
