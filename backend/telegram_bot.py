@@ -53,23 +53,28 @@ MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
 # ============================================================
 INTENT_RULES = [
     # (keywords, model, tool_group_key)
-    (["saldo", "rekening", "cash", "duit di bank"],            MODEL_FAST,  "bank"),
-    (["cc", "kartu kredit", "credit card", "cicilan cc"],      MODEL_FAST,  "cc"),
-    (["cicilan", "kpr", "kta", "hutang", "pinjaman"],          MODEL_FAST,  "loan"),
-    (["budget", "over budget", "alokasi"],                     MODEL_FAST,  "budget"),
-    (["pengeluaran", "expense", "belanja", "habis berapa"],    MODEL_FAST,  "expense"),
-    (["income", "pemasukan", "gaji", "salary"],                MODEL_FAST,  "income"),
-    (["net worth", "summary", "overview", "kondisi", "health"],MODEL_FAST,  "summary"),
-    (["catat", "tambah transaksi", "input transaksi"],         MODEL_FAST,  "trx_write"),
-    (["transaksi", "histori", "mutasi"],                       MODEL_FAST,  "trx_read"),
-    (["kurs", "fx", "dollar", "usd", "eur"],                   MODEL_FAST,  "market_fx"),
-    (["saham", "stock", "ihsg", "idx", "spx", "etf"],         MODEL_SMART, "market_stock"),
-    (["crypto", "bitcoin", "btc", "eth", "sol", "coin"],       MODEL_SMART, "market_crypto"),
-    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal"],   MODEL_SMART, "market_ta"),
-    (["news", "berita", "market update"],                      MODEL_SMART, "market_news"),
-    (["portfolio", "investasi", "reksadana", "emas"],          MODEL_SMART, "investment"),
-    (["tambah bank", "hapus bank", "edit bank"],               MODEL_FAST,  "crud_bank"),
-    (["brief", "pagi", "morning"],                             MODEL_SMART, "all"),
+    # --- Finance READ ---
+    (["saldo", "rekening", "cash", "duit di bank",
+      "terdiri", "rincian", "per bank", "masing", "breakdown bank"],  MODEL_FAST,  "bank"),
+    (["cc", "kartu kredit", "credit card", "tagihan"],                 MODEL_FAST,  "cc"),
+    (["cicilan", "kpr", "kta", "hutang", "pinjaman", "angsuran"],     MODEL_FAST,  "loan"),
+    (["budget", "over budget", "alokasi"],                             MODEL_FAST,  "budget"),
+    (["pengeluaran", "expense", "belanja", "habis berapa", "keluar"],  MODEL_FAST,  "expense"),
+    (["income", "pemasukan", "gaji", "salary", "masuk"],               MODEL_FAST,  "income"),
+    (["net worth", "summary", "overview", "kondisi keuangan",
+      "financial health", "total aset", "total hutang"],               MODEL_FAST,  "summary"),
+    (["catat", "tambah transaksi", "input transaksi", "record"],       MODEL_FAST,  "trx_write"),
+    (["transaksi", "histori", "mutasi", "list transaksi"],             MODEL_FAST,  "trx_read"),
+    # --- Market ---
+    (["kurs", "fx", "dollar", "usd", "eur", "nilai tukar"],            MODEL_FAST,  "market_fx"),
+    (["saham", "stock", "ihsg", "idx", "spx", "etf"],                  MODEL_SMART, "market_stock"),
+    (["crypto", "bitcoin", "btc", "eth", "sol", "coin", "kripto"],     MODEL_SMART, "market_crypto"),
+    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal"],           MODEL_SMART, "market_ta"),
+    (["news", "berita", "market update", "headline"],                   MODEL_SMART, "market_news"),
+    (["portfolio", "investasi", "reksadana", "emas", "p&l", "profit"], MODEL_SMART, "investment"),
+    # --- CRUD ---
+    (["tambah bank", "hapus bank", "edit bank", "update bank"],        MODEL_FAST,  "crud_bank"),
+    (["brief", "pagi", "morning", "daily"],                            MODEL_SMART, "all"),
 ]
 
 # Tool group mapping
@@ -82,8 +87,8 @@ def route(text: str):
         if any(k in lower for k in keywords):
             tools = TOOL_GROUPS.get(group, TOOLS)
             return model, tools
-    # Default: summary + smart model
-    return MODEL_FAST, TOOL_GROUPS.get("summary", TOOLS)
+    # Default: bank + summary (covers most follow-up questions)
+    return MODEL_FAST, TOOL_GROUPS.get("bank_summary", TOOLS)
 
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
 ALLOWED_USER_IDS = []
@@ -488,6 +493,7 @@ TOOL_GROUPS = {
     "market_news":  _tools("get_news"),
     "investment":   _tools("get_investments", "get_market_data"),
     "crud_bank":    _tools("manage_bank"),
+    "bank_summary": _tools("get_banks", "get_summary"),  # default fallback
     "all":          TOOLS,
 }
 
