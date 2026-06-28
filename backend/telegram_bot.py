@@ -1469,6 +1469,12 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
     }
     current = messages.copy()
     active_tools = tools if tools else TOOL_GROUPS.get("summary", TOOLS)
+    # 8B tidak reliable untuk write tool calling → upgrade ke 70B kalau ada write tools
+    _write_names = set(_WRITE_CORE)
+    _active_tool_names = {t["function"]["name"] for t in active_tools}
+    if model == MODEL_FAST and _active_tool_names & _write_names:
+        model = MODEL_SMART
+        logger.info("⬆️ Auto-upgrade ke 70B (write tools present)")
     # Fallback: if 70B hits rate limit, retry with 8B
     models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
@@ -1490,6 +1496,18 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
             resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
         if not resp.ok:
             logger.error(f"❌ Groq {resp.status_code}: {resp.text[:500]}")
+            # 400 tool_use_failed → auto-retry dengan 70B + clean history
+            if resp.status_code == 400 and "tool_use_failed" in resp.text:
+                if models_to_try[0] != MODEL_SMART:
+                    logger.warning("🔄 400 tool_use_failed → retry dengan 70B")
+                    models_to_try = [MODEL_SMART]
+                    continue
+                elif iteration == 0:
+                    # Sudah 70B tapi masih 400 → strip tool_calls dari history, retry tanpa tools
+                    logger.warning("🔄 400 pada 70B → retry tanpa tools")
+                    current = [m for m in current if m.get("role") != "tool" and "tool_calls" not in m]
+                    active_tools = []
+                    continue
             resp.raise_for_status()
         data    = resp.json()
         choice  = data["choices"][0]
