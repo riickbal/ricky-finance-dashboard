@@ -906,10 +906,12 @@ def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
         "Content-Type": "application/json"
     }
     current = messages.copy()
+    # Fallback: if 70B hits rate limit, retry with 8B
+    models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
     for iteration in range(6):  # max 6 iterations
         payload = {
-            "model":       model,
+            "model":       models_to_try[0],
             "messages":    current,
             "tools":       TOOLS,
             "tool_choice": "auto",
@@ -917,6 +919,12 @@ def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
             "max_tokens":  1024
         }
         resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+        # 429 rate limit → fallback ke model lebih kecil
+        if resp.status_code == 429 and len(models_to_try) > 1:
+            logger.warning(f"⚠️ 429 rate limit on {models_to_try[0]}, fallback ke {models_to_try[1]}")
+            models_to_try = [models_to_try[1]]
+            payload["model"] = models_to_try[0]
+            resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         data    = resp.json()
         choice  = data["choices"][0]
