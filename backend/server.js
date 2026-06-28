@@ -488,7 +488,7 @@ app.post('/api/investments', (req, res) => {
       INSERT INTO investments (platform, ticker, type, qty, avg_buy, currency, cost_basis,
       current_price, platform_cash, last_update, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, ticker, type||'Saham IDX', qty||0, avgBuy||0, currency||'IDR',
+    `).run(platform, ticker, type||'Investment', qty||0, avgBuy||0, currency||'IDR',
            costBasis||0, currentPrice||0, platformCash||0,
            new Date().toISOString().split('T')[0], notes||null);
     console.log(`✅ Investment created: ${ticker}`);

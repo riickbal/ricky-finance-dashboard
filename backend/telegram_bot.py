@@ -524,7 +524,7 @@ TOOLS = [
                     "action":       {"type": "string", "enum": ["create","update","delete"]},
                     "ticker":       {"type": "string", "description": "Ticker, e.g. 'BBRI', 'BTC'. Wajib untuk semua action."},
                     "platform":     {"type": "string", "description": "Platform: Stockbit / Binance / Indodax / Pluang"},
-                    "type":         {"type": "string", "description": "Tipe: Saham IDX / ETF / Crypto / Reksadana"},
+                    "type":         {"type": "string", "description": "Tipe: Investment / ETF / Crypto / Reksadana / Emas"},
                     "qty":          {"type": "number", "description": "Jumlah lot/unit"},
                     "avgBuy":       {"type": "number", "description": "Harga rata-rata beli"},
                     "currency":     {"type": "string", "description": "IDR atau USD"},
@@ -1139,10 +1139,10 @@ def exec_get_news(limit: int = 10) -> str:
 
 
 def _mask_acct(acct):
-    """Auto-mask nomor rekening → ****XXX (3 digit terakhir)."""
+    """Auto-mask nomor rekening → ****XXXX (4 digit terakhir)."""
     if not acct: return acct
     acct = str(acct).strip().replace("*", "")  # strip existing asterisks
-    return f"****{acct[-3:]}" if len(acct) >= 3 else acct
+    return f"****{acct[-4:]}" if len(acct) >= 4 else acct
 
 def exec_manage_bank(action, nick, name=None, cat=None, type_=None, acct=None, balance=None, notes=None) -> str:
     acct = _mask_acct(acct)  # always mask before saving
