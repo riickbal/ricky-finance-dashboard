@@ -237,7 +237,32 @@ MAX_TOOL_RESULT = 4000  # Max chars per tool result
 # ============================================================
 # SYSTEM PROMPT
 # ============================================================
-SYSTEM_PROMPT = """Kamu adalah Edith, PA finansial Ricky. Casual Jaksel (gua/lo), smart, to the point.
+# ============================================================
+# EDITH MEMORY SYSTEM
+# ============================================================
+import json as _json_mem
+_MEMORY_FILE = _Path(__file__).parent / "edith_memory.json"
+
+def _load_memory() -> dict:
+    try:
+        return _json_mem.loads(_MEMORY_FILE.read_text()) if _MEMORY_FILE.exists() else {}
+    except: return {}
+
+def _save_memory_entry(key: str, value: str):
+    mem = _load_memory()
+    mem[key] = value
+    _MEMORY_FILE.write_text(_json_mem.dumps(mem, ensure_ascii=False, indent=2))
+
+def _memory_to_prompt() -> str:
+    mem = _load_memory()
+    if not mem: return ""
+    lines = [f"- {k}: {v}" for k, v in mem.items()]
+    return "\n\n**MEMORY (hal yang lo tau tentang Ricky):**\n" + "\n".join(lines)
+
+def build_system_prompt() -> str:
+    return BASE_SYSTEM_PROMPT + _memory_to_prompt()
+
+BASE_SYSTEM_PROMPT = """Kamu adalah Edith, PA finansial Ricky. Casual Jaksel (gua/lo), smart, to the point.
 
 # RULES
 
@@ -270,7 +295,15 @@ SYSTEM_PROMPT = """Kamu adalah Edith, PA finansial Ricky. Casual Jaksel (gua/lo)
 - 404 → data ga ketemu, suruh cek yang terdaftar
 - Rate limit → tunggu 30 detik
 
-**FORMAT:** Rp 15,000,000 (bukan 15000000). Table kalau compare. Singkat & direct."""
+**FORMAT:** Rp 15,000,000 (bukan 15000000). Table kalau compare. Singkat & direct.
+
+**MEMORY & LEARNING:**
+- Kalau Ricky kasih tau info tentang dirinya, kebiasaan, atau preferensi → panggil save_memory(key, value)
+- Kalau Ricky ngetik typo/singkatan yang lo udah tau maksudnya → langsung paham, ga perlu tanya
+- Setelah dapat context baru yang penting → simpan ke memory
+- Contoh yang wajib disimpan: rekening penting, pola pengeluaran rutin, preferensi kategori, auto-debit schedule"""
+
+SYSTEM_PROMPT = BASE_SYSTEM_PROMPT  # alias for compatibility
 
 # ============================================================
 # TOOLS DEFINITION (OpenAI format — granular per package)
@@ -637,6 +670,29 @@ TOOLS = [
             "description": "Ambil portfolio investasi + P&L (profit/loss) berdasarkan harga current vs avg buy. Gunakan ini untuk pertanyaan untung/rugi investasi.",
             "parameters": {"type": "object", "properties": {}, "required": []}
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_memory",
+            "description": "Simpan informasi penting tentang Ricky ke memory permanen — kebiasaan, preferensi, pola, info rekening, auto-debit schedule, singkatan yang dia pakai. Panggil ini kapanpun lo belajar sesuatu yang berguna untuk interaksi berikutnya.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key":   {"type": "string", "description": "Label singkat, spesifik. Contoh: 'auto_debit_permata', 'kategori_grab', 'gaji_tanggal'"},
+                    "value": {"type": "string", "description": "Isi memory. Pakai bahasa natural, detail."}
+                },
+                "required": ["key", "value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_memory",
+            "description": "Ambil semua memory yang sudah tersimpan tentang Ricky. Panggil kalau butuh konteks personal yang mungkin sudah pernah dipelajari.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
     }
 ]
 
@@ -646,7 +702,8 @@ def _tools(*names):
 # Write tools yang selalu disertakan agar model ga pernah call tool yang ga ada
 _WRITE_CORE = ("add_transaction", "manage_bank", "manage_creditcard",
                "manage_investment", "manage_loan", "manage_budget",
-               "manage_transaction", "update_bank_balance")
+               "manage_transaction", "update_bank_balance",
+               "save_memory", "get_memory")
 
 def _rw(*names):
     """Read tools + write core — model bisa baca DAN tulis."""
@@ -722,6 +779,8 @@ TOOL_GROUPS = {
     "compound":       _rw("get_banks", "get_transactions", "get_summary"),
     "all_write":      _tools(*_WRITE_CORE),
     "all":            TOOLS,
+    # Memory tools ditambahkan ke semua group via _rw — save_memory always available
+}
 }
 
 # ============================================================
@@ -1481,7 +1540,15 @@ def execute_tool(name: str, args: dict) -> str:
             desc=args.get("desc")
         )
     else:
-        result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
+        elif name == "save_memory":
+            _save_memory_entry(args.get("key", ""), args.get("value", ""))
+            result = json.dumps({"success": True, "saved": args.get("key")})
+            logger.info(f"🧠 Memory saved: {args.get('key')} = {args.get('value')[:60]}")
+        elif name == "get_memory":
+            mem = _load_memory()
+            result = json.dumps({"memory": mem, "count": len(mem)}, ensure_ascii=False)
+        else:
+            result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
 
     # Semua hasil dilewatkan ke error enricher → friendly context kalau ada error
     return _enrich_error(result, name, args)
@@ -1874,7 +1941,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     logger.info(f"💬 [{uid}] {user.first_name}: {text}")
 
     add_msg(uid, "user", text)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + get_history(uid)
+    messages = [{"role": "system", "content": build_system_prompt()}] + get_history(uid)
 
     # Send placeholder immediately so user knows bot received it
     placeholder = await update.message.reply_text("⏳")
