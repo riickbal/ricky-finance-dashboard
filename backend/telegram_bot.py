@@ -78,7 +78,8 @@ ALLOWED_USER_IDS = []
 # Daily brief jam 5 pagi WIB (UTC+7 = UTC 22:00 malam sebelumnya)
 DAILY_BRIEF_HOUR_UTC = 22
 
-MAX_HISTORY = 20
+MAX_HISTORY = 6  # Keep short to avoid 413 Payload Too Large on Groq
+MAX_TOOL_RESULT = 4000  # Max chars per tool result
 
 # ============================================================
 # SYSTEM PROMPT
@@ -942,6 +943,9 @@ def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
                 try: args = json.loads(args)
                 except: args = {}
             result = execute_tool(name, args)
+            # Truncate large results to avoid 413 Payload Too Large
+            if len(result) > MAX_TOOL_RESULT:
+                result = result[:MAX_TOOL_RESULT] + "\n...[truncated]"
             logger.info(f"✅ Tool result: {result[:120]}...")
             # OpenAI format requires tool_call_id
             current.append({
