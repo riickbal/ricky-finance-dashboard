@@ -1,5 +1,5 @@
 // data.js — Auto-synced from Finance API
-// Last updated: 2026-06-28 20:53:34
+// Last updated: 2026-06-28 20:53:35
 // DO NOT EDIT MANUALLY — managed by Edith
 
 const FINANCE_DATA = {
@@ -212,6 +212,15 @@ const FINANCE_DATA = {
     }
   ],
   "transactions": [
+    {
+      "id": "t75",
+      "date": "2026-06-28",
+      "type": "In",
+      "category": "Transfer",
+      "account": "Permata 598",
+      "amount": 150000,
+      "desc": "Auto debit dari Permata 734"
+    },
     {
       "id": "t74",
       "date": "2026-06-28",
