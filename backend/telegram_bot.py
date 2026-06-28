@@ -280,11 +280,14 @@ NAMA REKENING — WAJIB pakai field "nick" dari data, DILARANG rekonstruksi nama
 ❌ SALAH: BCA Digital, BCA (Digital), Blu by BCA, CIMB Niaga, Bank Permata
 ✅ BENAR: BLU 904, BCA 062, BCA 968, CIMB 200, Permata 734, Permata 829, Permata 598
 
-FORMAT SALDO — selalu tabel:
-| Nick | Saldo |
-|------|-------|
-| BLU 904 | Rp 1,355,000 |
-Jangan bullet list. Jangan disclaimer "saldo bisa berubah". Jangan JSON mentah.
+FORMAT TABEL — Telegram tidak render markdown table. Gunakan code block:
+```
+Nick          Saldo
+BLU 904       Rp 1,355,000
+BCA 062       Rp   878,600
+CIMB 200      Rp    50,000
+```
+Jangan pipe | untuk tabel. Jangan bullet list. Jangan disclaimer. Jangan JSON mentah.
 
 INSIGHT: Setelah data → kasih konteks singkat. Flag otomatis: CC util >70% ⚠️ | DTI >30% ⚠️ | over budget ⚠️
 
