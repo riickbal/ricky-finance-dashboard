@@ -1,5 +1,5 @@
 // data.js — Auto-synced from Finance API
-// Last updated: 2026-06-28 20:53:13
+// Last updated: 2026-06-28 20:53:15
 // DO NOT EDIT MANUALLY — managed by Edith
 
 const FINANCE_DATA = {
@@ -841,6 +841,15 @@ const FINANCE_DATA = {
       "account": "Permata -> BCA 730",
       "amount": 500000,
       "desc": "Transfer internal Permata ke BCA 7305025062"
+    },
+    {
+      "id": "t73",
+      "date": "2024-03-25",
+      "type": "In",
+      "category": "Transfer",
+      "account": "Permata 598",
+      "amount": 150000,
+      "desc": "Auto Debit"
     },
     {
       "id": "t72",
