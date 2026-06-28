@@ -1138,7 +1138,14 @@ def exec_get_news(limit: int = 10) -> str:
         return json.dumps({"error": str(e)})
 
 
+def _mask_acct(acct):
+    """Auto-mask nomor rekening → ****XXX (3 digit terakhir)."""
+    if not acct: return acct
+    acct = str(acct).strip().replace("*", "")  # strip existing asterisks
+    return f"****{acct[-3:]}" if len(acct) >= 3 else acct
+
 def exec_manage_bank(action, nick, name=None, cat=None, type_=None, acct=None, balance=None, notes=None) -> str:
+    acct = _mask_acct(acct)  # always mask before saving
     try:
         if action == "create":
             payload = {"name": name, "nick": nick, "cat": cat, "type": type_, "acct": acct, "balance": balance, "notes": notes}
