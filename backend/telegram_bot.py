@@ -110,9 +110,9 @@ INTENT_RULES = [
     # MULTI-DOMAIN / COMBINED
     # -------------------------------------------------------
     (["net worth", "networth", "total kekayaan",
-      "kekayaan bersih", "nilai bersih"],                             MODEL_FAST,  "networth"),
+      "kekayaan bersih", "nilai bersih"],                             MODEL_SMART, "networth"),
     (["total aset", "punya apa aja", "semua aset",
-      "kekayaan total"],                                              MODEL_FAST,  "assets"),
+      "kekayaan total"],                                              MODEL_SMART, "assets"),
     (["kondisi keuangan", "financial health", "gimana keuangan",
       "review keuangan", "cek keuangan", "keseluruhan",
       "financial overview"],                                          MODEL_SMART, "full_finance"),
@@ -179,21 +179,25 @@ MAX_TOOL_RESULT = 4000  # Max chars per tool result
 # ============================================================
 SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI assistant.
 
-## Finance Rules — Tool Selection (PENTING: panggil yang paling spesifik)
-- Saldo bank / cash?          → get_banks()
-- Kartu kredit / CC?          → get_credit_cards()
-- Investasi / portfolio?      → get_investments()
-- Cicilan / hutang / KPR/KTA? → get_loans()
-- Budget vs actual?           → get_budgets()
-- Pengeluaran detail?         → get_expenses(month)
-- Pemasukan / income?         → get_income(month)
-- Net worth / summary / DTI / CF? → get_summary()
-- Histori transaksi detail?   → get_transactions(month, category)
-- Catat transaksi baru?       → add_transaction(...)
-- Update saldo bank?          → update_bank_balance(nick, balance)
-- JANGAN panggil lebih dari yang dibutuhkan!
+## CRITICAL RULE — WAJIB TANPA EXCEPTION
+**JANGAN PERNAH menjawab pertanyaan keuangan dari memori atau asumsi.**
+**SELALU panggil tool yang sesuai TERLEBIH DAHULU, baru jawab berdasarkan data yang dikembalikan.**
+Kalau tool belum dipanggil = JANGAN jawab angka apapun.
+
+## Finance Rules — Tool Selection
+- Saldo bank / cash / rekening?   → get_banks()
+- Kartu kredit / CC / tagihan?    → get_credit_cards()
+- Investasi / portfolio?          → get_investments() atau get_investment_pl()
+- Cicilan / hutang / KPR/KTA?     → get_loans()
+- Budget vs actual / over budget? → get_budgets()
+- Pengeluaran detail?             → get_expenses(month)
+- Pemasukan / income?             → get_income(month)
+- Net worth / DTI / cash flow / summary? → get_summary()
+- Histori transaksi?              → get_transactions()
+- Catat transaksi?                → KONFIRMASI DULU → add_transaction()
+- Update saldo?                   → update_bank_balance()
 - Numbers: Rp 15,000,000 format (not 15000000)
-- Lead with number/insight, then explain. Short & direct.
+- Lead with number/insight. Short & direct.
 - Flag risks ⚠️, positives ✅
 - Tables when comparing multiple items
 
