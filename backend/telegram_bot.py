@@ -167,15 +167,17 @@ TOOL_GROUPS: dict = {}  # filled after TOOLS is defined
 # ============================================================
 # Write-action trigger words — tiap kata ini = 1 operasi tulis
 _WRITE_TRIGGERS = [
-    "catat", "input transaksi", "masukin", "record transaksi",
+    "catat", "catet", "catetan", "input transaksi", "masukin", "record transaksi",
     "tambah transaksi", "hapus transaksi", "delete transaksi",
     "edit transaksi", "koreksi transaksi", "ganti transaksi",
-    "tambah rekening", "tambah bank", "hapus bank", "edit bank",
+    "tambah rekening", "buat rekening", "bikin rekening", "bikin account",
+    "tambah bank", "hapus bank", "edit bank",
     "tambah cc", "hapus cc", "edit cc", "tambah kartu",
     "tambah investasi", "hapus investasi", "edit investasi",
     "tambah pinjaman", "hapus pinjaman", "edit loan",
     "set budget", "ubah budget", "hapus budget", "tambah budget", "tambah kategori",
     "update saldo", "update kpr", "update kta",
+    "kecatat", "dicatat", "diinput", "dimasukin",
 ]
 _COMPOUND_CONNECTORS = [
     " dan ", " juga ", " sekalian ", " sekaligus ", " plus ",
@@ -641,43 +643,55 @@ TOOLS = [
 def _tools(*names):
     return [t for t in TOOLS if t["function"]["name"] in names]
 
+# Write tools yang selalu disertakan agar model ga pernah call tool yang ga ada
+_WRITE_CORE = ("add_transaction", "manage_bank", "manage_creditcard",
+               "manage_investment", "manage_loan", "manage_budget",
+               "manage_transaction", "update_bank_balance")
+
+def _rw(*names):
+    """Read tools + write core — model bisa baca DAN tulis."""
+    return _tools(*names, *_WRITE_CORE)
+
 TOOL_GROUPS = {
-    "bank":         _tools("get_banks", "update_bank_balance"),
-    "cc":           _tools("get_credit_cards"),
-    "loan":         _tools("get_loans"),
-    "budget":       _tools("get_budgets"),
-    "expense":      _tools("get_expenses"),
-    "income":       _tools("get_income"),
-    "summary":      _tools("get_summary"),
-    "trx_read":     _tools("get_transactions"),
-    "trx_write":    _tools("add_transaction"),
-    "market_fx":    _tools("get_fx_rates"),
-    "market_stock": _tools("get_market_data", "get_fx_rates"),
-    "market_crypto":_tools("get_crypto_prices", "get_market_data"),
-    "market_ta":    _tools("get_market_data", "get_crypto_prices"),
-    "market_news":  _tools("get_news"),
-    "investment":   _tools("get_investments", "get_market_data"),
-    "crud_bank":    _tools("manage_bank"),
-    "bank_summary":   _tools("get_banks", "get_summary"),
-    "receivables":    _tools("get_receivables"),
-    "fixed_assets":   _tools("get_fixed_assets"),
-    "expenses_mom":   _tools("get_expenses_compare"),
-    "invest_pl":      _tools("get_investment_pl", "get_investments"),
-    # --- Combined multi-domain ---
-    "assets":         _tools("get_banks", "get_investments", "get_fixed_assets", "get_receivables", "get_summary"),
-    "networth":       _tools("get_summary", "get_banks", "get_investments", "get_loans", "get_credit_cards", "get_fixed_assets", "get_receivables"),
-    "full_finance":   _tools("get_banks", "get_investments", "get_loans", "get_credit_cards", "get_budgets", "get_summary", "get_fixed_assets", "get_receivables"),
-    "invest_market":  _tools("get_investment_pl", "get_investments", "get_market_data", "get_crypto_prices"),
-    "advice":         _tools("get_summary", "get_investment_pl", "get_market_data", "get_crypto_prices", "get_banks", "get_loans", "get_budgets"),
-    "crud_bank":       _tools("manage_bank", "get_banks"),
-    "crud_cc":         _tools("manage_creditcard", "get_credit_cards"),
-    "crud_investment": _tools("manage_investment", "get_investments"),
-    "crud_loan":       _tools("manage_loan", "get_loans"),
-    "crud_budget":     _tools("manage_budget", "get_budgets"),
-    "all_write":       _tools("add_transaction", "manage_bank", "manage_creditcard", "manage_investment", "manage_loan", "manage_budget", "manage_transaction", "update_bank_balance"),
-    # Compound: write tools + read essentials (lean, bukan all 20+ tools)
-    "compound":        _tools("add_transaction", "manage_bank", "manage_creditcard", "manage_investment", "manage_loan", "manage_budget", "manage_transaction", "update_bank_balance", "get_banks", "get_transactions", "get_summary"),
-    "all":             TOOLS,
+    # READ-ONLY groups (market & non-write queries — ga perlu write tools)
+    "market_fx":      _tools("get_fx_rates"),
+    "market_stock":   _tools("get_market_data", "get_fx_rates"),
+    "market_crypto":  _tools("get_crypto_prices", "get_market_data"),
+    "market_ta":      _tools("get_market_data", "get_crypto_prices"),
+    "market_news":    _tools("get_news"),
+
+    # FINANCE groups — semua include write core
+    "bank":           _rw("get_banks", "update_bank_balance"),
+    "bank_summary":   _rw("get_banks", "get_summary"),
+    "cc":             _rw("get_credit_cards"),
+    "loan":           _rw("get_loans"),
+    "budget":         _rw("get_budgets"),
+    "expense":        _rw("get_expenses"),
+    "income":         _rw("get_income"),
+    "summary":        _rw("get_summary"),
+    "trx_read":       _rw("get_transactions"),
+    "trx_write":      _rw("get_banks", "get_transactions"),
+    "receivables":    _rw("get_receivables"),
+    "fixed_assets":   _rw("get_fixed_assets"),
+    "expenses_mom":   _rw("get_expenses_compare"),
+    "invest_pl":      _rw("get_investment_pl", "get_investments"),
+    "invest_market":  _rw("get_investment_pl", "get_investments", "get_market_data", "get_crypto_prices"),
+
+    # CRUD groups
+    "crud_bank":       _rw("get_banks"),
+    "crud_cc":         _rw("get_credit_cards"),
+    "crud_investment": _rw("get_investments"),
+    "crud_loan":       _rw("get_loans"),
+    "crud_budget":     _rw("get_budgets"),
+
+    # MULTI-DOMAIN
+    "assets":         _rw("get_banks", "get_investments", "get_fixed_assets", "get_receivables", "get_summary"),
+    "networth":       _rw("get_summary", "get_banks", "get_investments", "get_loans", "get_credit_cards", "get_fixed_assets", "get_receivables"),
+    "full_finance":   _rw("get_banks", "get_investments", "get_loans", "get_credit_cards", "get_budgets", "get_summary", "get_fixed_assets", "get_receivables"),
+    "advice":         _rw("get_summary", "get_investment_pl", "get_market_data", "get_crypto_prices", "get_banks", "get_loans", "get_budgets"),
+    "compound":       _rw("get_banks", "get_transactions", "get_summary"),
+    "all_write":      _tools(*_WRITE_CORE),
+    "all":            TOOLS,
 }
 
 # ============================================================
