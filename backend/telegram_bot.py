@@ -268,6 +268,12 @@ BASE_SYSTEM_PROMPT = """Kamu adalah Edith, PA finansial Ricky. Casual Jaksel (gu
 
 **DATA:** Jangan pernah jawab angka dari memori. Selalu panggil tool dulu, baru jawab.
 
+**TAMPILAN REKENING:** Selalu pakai `nick` (bukan name) saat sebut rekening — contoh: "BCA 062", "Permata 734", "CIMB 200". Jangan pernah cuma sebut "BCA" atau "Permata" tanpa identifier.
+
+**TRANSFER ANTAR REKENING:** Kalau ada transfer/debit antar rekening → wajib update balance KEDUA rekening: Out dari source + In ke destination. Jangan cuma catat transaksi tanpa update_bank_balance kedua akun.
+
+**UPDATE SALDO:** Backend otomatis update saldo setiap add_transaction dipanggil. Lo TIDAK perlu panggil update_bank_balance setelah add_transaction — sudah auto. Panggil update_bank_balance HANYA kalau user minta koreksi saldo secara eksplisit. Jangan hitung saldo manual di response — kalau user tanya saldo terkini, panggil get_banks.
+
 **TOOLS:**
 - Bank/saldo → get_banks | CC/tagihan → get_credit_cards | Pinjaman/KPR/KTA → get_loans
 - Budget → get_budgets | Pengeluaran → get_expenses | Income → get_income
@@ -1360,13 +1366,25 @@ if (typeof window !== 'undefined') {{
 """
         data_js_path.write_text(js_content, encoding="utf-8")
 
-        # Git push
-        subprocess.run(["git", "add", "data.js"], cwd=PROJECT_ROOT, check=True, capture_output=True)
-        subprocess.run(
+        # Git push — set HOME/PATH eksplisit biar launchctl punya credentials
+        _env = {
+            **os.environ,
+            "HOME": str(_Path.home()),
+            "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
+            "GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=no"
+        }
+        # Remove stale lock if exists
+        lock = PROJECT_ROOT / ".git" / "index.lock"
+        if lock.exists(): lock.unlink()
+
+        subprocess.run(["git", "add", "data.js"], cwd=PROJECT_ROOT, check=True, capture_output=True, env=_env)
+        result = subprocess.run(
             ["git", "commit", "-m", f"[Edith] {commit_msg}"],
-            cwd=PROJECT_ROOT, check=True, capture_output=True
+            cwd=PROJECT_ROOT, capture_output=True, env=_env
         )
-        subprocess.run(["git", "push"], cwd=PROJECT_ROOT, check=True, capture_output=True)
+        if result.returncode not in (0, 1):  # 1 = nothing to commit, ok
+            raise Exception(result.stderr.decode())
+        subprocess.run(["git", "push"], cwd=PROJECT_ROOT, check=True, capture_output=True, env=_env)
         logger.info(f"✅ GitHub synced: {commit_msg}")
     except Exception as e:
         logger.warning(f"⚠️ GitHub sync failed (non-critical): {e}")

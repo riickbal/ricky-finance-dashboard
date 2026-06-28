@@ -276,6 +276,16 @@ app.post('/api/transactions', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, date, type, category, account, amount, desc || null);
 
+    // AUTO-UPDATE BANK BALANCE — no need for separate update_bank_balance call
+    const bank = db.prepare('SELECT balance FROM banks WHERE nick = ?').get(account);
+    if (bank != null) {
+      const delta = type === 'In' ? +amount : -amount;
+      const newBalance = (bank.balance || 0) + delta;
+      db.prepare("UPDATE banks SET balance = ?, updated = date('now') WHERE nick = ?")
+        .run(newBalance, account);
+      console.log(`✅ Auto-balance: ${account} ${type === 'In' ? '+' : '-'}${amount} → Rp${newBalance.toLocaleString('id-ID')}`);
+    }
+
     console.log(`✅ Transaction added: ${id} | ${date} | ${type} | ${category} | ${account} | ${amount}`);
     res.status(201).json({ success: true, id, message: `Transaction ${id} saved` });
   } catch (e) {
