@@ -659,14 +659,28 @@ def _num(v, default=0):
     except: return default
 
 def _date(v):
-    """Sanitize date arg — kalau model kirim 'current date' / None → today."""
+    """Sanitize date arg — handle berbagai format dari model."""
     from datetime import date as _date_cls
-    today = _date_cls.today().isoformat()
-    if not v or not isinstance(v, str): return today
-    # Reject non-ISO strings like "current date", "today", etc
     import re
-    if re.match(r'^\d{4}-\d{2}-\d{2}$', v.strip()): return v.strip()
-    return today
+    today = _date_cls.today()
+    if not v or not isinstance(v, str): return today.isoformat()
+    v = v.strip()
+    # Full ISO date: 2026-06-25
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', v): return v
+    # Day only: "25" → current month/year
+    if re.match(r'^\d{1,2}$', v):
+        day = int(v)
+        try:
+            return today.replace(day=day).isoformat()
+        except: return today.isoformat()
+    # MM-DD or DD/MM: try current year
+    if re.match(r'^\d{1,2}[/-]\d{1,2}$', v):
+        parts = re.split(r'[/-]', v)
+        try:
+            return today.replace(month=int(parts[0]), day=int(parts[1])).isoformat()
+        except: return today.isoformat()
+    # Anything else (e.g. "current date", "today") → today
+    return today.isoformat()
 
 TOOL_GROUPS = {
     # READ-ONLY groups (market & non-write queries — ga perlu write tools)
@@ -1129,14 +1143,23 @@ def exec_manage_bank(action, nick, name=None, cat=None, type_=None, acct=None, b
         if action == "create":
             payload = {"name": name, "nick": nick, "cat": cat, "type": type_, "acct": acct, "balance": balance, "notes": notes}
             resp = requests.post(f"{FINANCE_URL}/api/banks", json=payload, timeout=10)
+            result = resp.json()
+            # Auto-upsert: kalau UNIQUE conflict → switch ke update otomatis
+            if not result.get("success") and "UNIQUE" in str(result.get("error", "")):
+                update_payload = {k: v for k, v in {"name": name, "cat": cat, "type": type_, "acct": acct, "balance": balance, "notes": notes}.items() if v is not None}
+                resp = requests.put(f"{FINANCE_URL}/api/banks/{nick}", json=update_payload, timeout=10)
+                result = resp.json()
+                result["_note"] = f"Bank '{nick}' sudah ada — data diupdate."
+                action = "update"
         elif action == "update":
             payload = {k: v for k, v in {"name": name, "cat": cat, "type": type_, "acct": acct, "balance": balance, "notes": notes}.items() if v is not None}
             resp = requests.put(f"{FINANCE_URL}/api/banks/{nick}", json=payload, timeout=10)
+            result = resp.json()
         elif action == "delete":
             resp = requests.delete(f"{FINANCE_URL}/api/banks/{nick}", timeout=10)
+            result = resp.json()
         else:
             return json.dumps({"error": "action harus create/update/delete"})
-        result = resp.json()
         if result.get("success"):
             _sync_to_github(f"bank {action}: {nick}")
         return json.dumps(result, ensure_ascii=False)
@@ -1478,6 +1501,8 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
     # Fallback: if 70B hits rate limit, retry with 8B
     models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
+    _executed_writes: set = set()  # dedup: cegah model re-execute write op yang sama
+
     for iteration in range(6):  # max 6 iterations
         payload = {
             "model":       models_to_try[0],
@@ -1533,6 +1558,15 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
             if isinstance(args, str):
                 try: args = json.loads(args)
                 except: args = {}
+            # Dedup write ops — skip kalau exact same call sudah dieksekusi di loop ini
+            if name in _WRITE_CORE:
+                dedup_key = f"{name}:{json.dumps(args, sort_keys=True)}"
+                if dedup_key in _executed_writes:
+                    logger.warning(f"⏭️ Skip duplicate write: {name}")
+                    result = json.dumps({"success": True, "_note": "skipped duplicate"})
+                    current.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result})
+                    continue
+                _executed_writes.add(dedup_key)
             result = execute_tool(name, args)
             # Truncate large results to avoid 413 Payload Too Large
             if len(result) > MAX_TOOL_RESULT:
