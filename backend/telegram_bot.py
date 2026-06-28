@@ -53,110 +53,168 @@ MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
 # ============================================================
 INTENT_RULES = [
     # -------------------------------------------------------
-    # FINANCE READ (urutan: specific dulu baru general)
-    # -------------------------------------------------------
-    (["saldo", "rekening", "duit di bank",
-      "terdiri", "rincian", "per bank", "masing", "breakdown bank",
-      "update saldo"],                                                  MODEL_FAST,  "bank"),
-    (["cc", "kartu kredit", "credit card", "tagihan cc",
-      "due date", "limit cc", "outstanding cc", "utilization"],        MODEL_FAST,  "cc"),
-    (["cicilan", "kpr", "kta", "pinjaman", "angsuran",
-      "lunas", "tenor", "sisa hutang", "outstanding loan"],            MODEL_FAST,  "loan"),
-    (["budget", "over budget", "alokasi", "sisa budget",
-      "limit belanja"],                                                 MODEL_FAST,  "budget"),
-    (["pengeluaran", "expense", "belanja", "habis berapa",
-      "keluar", "spending", "kategori pengeluaran"],                   MODEL_FAST,  "expense"),
-    (["income", "pemasukan", "gaji", "salary",
-      "penghasilan", "terima"],                                        MODEL_FAST,  "income"),
-    (["dti", "debt to income", "cash flow", "cashflow",
-      "savings rate", "tabungan bulanan"],                             MODEL_FAST,  "summary"),
-    (["catat", "tambah transaksi", "input", "record transaksi",
-      "masukin transaksi"],                                            MODEL_FAST,  "trx_write"),
-    (["transaksi", "histori", "mutasi", "list transaksi",
-      "riwayat"],                                                      MODEL_FAST,  "trx_read"),
-    # -------------------------------------------------------
-    # PIUTANG & ASET TETAP
-    # -------------------------------------------------------
-    (["piutang", "receivable", "pinjamin", "tagih",
-      "utang ke gua", "belum dibayar orang", "nyatain"],              MODEL_FAST,  "receivables"),
-    (["aset tetap", "properti", "kendaraan", "rumah", "mobil",
-      "fixed asset", "depresiasi", "book value", "inventaris"],       MODEL_FAST,  "fixed_assets"),
-    # -------------------------------------------------------
-    # MARKET
-    # -------------------------------------------------------
-    (["kurs", "fx", "dollar", "usd", "eur", "sgd", "jpy",
-      "nilai tukar", "exchange rate"],                                 MODEL_FAST,  "market_fx"),
-    (["saham", "stock", "ihsg", "idx", "spx", "etf",
-      "bbca", "tlkm", "bbri", "bmri", "aapl", "msft"],               MODEL_SMART, "market_stock"),
-    (["crypto", "bitcoin", "btc", "eth", "sol", "bnb",
-      "xrp", "coin", "kripto", "altcoin"],                            MODEL_SMART, "market_crypto"),
-    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal",
-      "support", "resistance", "bullish", "bearish", "trend"],        MODEL_SMART, "market_ta"),
-    (["news", "berita", "market update", "headline", "sentimen"],     MODEL_SMART, "market_news"),
-    # -------------------------------------------------------
-    # INVESTASI
-    # -------------------------------------------------------
-    (["p&l", "profit loss", "untung rugi", "unrealized",
-      "return invest", "gain", "loss", "portfolio pl", "roi"],        MODEL_SMART, "invest_pl"),
-    (["reksadana", "emas", "mutual fund", "gold"],                    MODEL_SMART, "invest_market"),
-    (["portfolio", "investasi", "invest gua", "kondisi invest",
-      "posisi invest", "aset invest"],                                 MODEL_SMART, "invest_market"),
-    # -------------------------------------------------------
-    # PERBANDINGAN / TREN
-    # -------------------------------------------------------
-    (["banding", "compare", "bulan lalu", "month over month",
-      "mom", "naik turun", "tren pengeluaran", "vs bulan"],           MODEL_SMART, "expenses_mom"),
-    # -------------------------------------------------------
-    # MULTI-DOMAIN / COMBINED
-    # -------------------------------------------------------
-    (["net worth", "networth", "total kekayaan",
-      "kekayaan bersih", "nilai bersih"],                             MODEL_SMART, "networth"),
-    (["total aset", "punya apa aja", "semua aset",
-      "kekayaan total"],                                              MODEL_SMART, "assets"),
-    (["kondisi keuangan", "financial health", "gimana keuangan",
-      "review keuangan", "cek keuangan", "keseluruhan",
-      "financial overview"],                                          MODEL_SMART, "full_finance"),
-    (["layak beli", "aman ga", "worth it", "bisa beli",
-      "mampu ga", "sanggup"],                                         MODEL_SMART, "advice"),
-    (["saran", "advice", "harus gimana", "strategi",
-      "rekomendasi", "sebaiknya", "optimal", "plan keuangan",
-      "financial plan", "next step"],                                 MODEL_SMART, "advice"),
-    # -------------------------------------------------------
-    # CRUD ENTITIES
+    # 1. CRUD (paling specific — cek duluan sebelum READ)
     # -------------------------------------------------------
     (["tambah bank", "hapus bank", "edit bank",
       "update bank", "buat rekening"],                                MODEL_FAST,  "crud_bank"),
-    (["tambah cc", "hapus cc", "edit cc", "tambah kartu"],            MODEL_FAST,  "crud_cc"),
+    (["tambah cc", "hapus cc", "edit cc", "tambah kartu",
+      "update cc", "delete cc"],                                      MODEL_FAST,  "crud_cc"),
     (["tambah investasi", "hapus investasi", "edit investasi",
-      "update investasi"],                                            MODEL_FAST,  "crud_investment"),
+      "update investasi", "delete investasi"],                        MODEL_FAST,  "crud_investment"),
     (["tambah pinjaman", "hapus pinjaman", "edit loan",
-      "update kpr", "update kta"],                                    MODEL_FAST,  "crud_loan"),
+      "update kpr", "update kta", "delete pinjaman"],                MODEL_FAST,  "crud_loan"),
     (["set budget", "ubah budget", "hapus budget",
-      "update budget", "atur budget"],                                MODEL_FAST,  "crud_budget"),
+      "update budget", "atur budget", "delete budget"],              MODEL_FAST,  "crud_budget"),
     # -------------------------------------------------------
-    # DAILY BRIEF
+    # 2. ADVICE / MULTI-DOMAIN (sebelum market biar ga ke-grab saham)
     # -------------------------------------------------------
-    (["brief", "pagi", "morning", "daily", "rangkuman harian"],       MODEL_SMART, "all"),
+    (["layak beli", "aman ga", "worth it", "bisa beli",
+      "mampu ga", "sanggup", "cocok ga"],                            MODEL_SMART, "advice"),
+    (["saran", "advice", "harus gimana", "strategi",
+      "rekomendasi", "sebaiknya", "optimal", "plan keuangan",
+      "financial plan", "next step", "gimana baiknya"],              MODEL_SMART, "advice"),
+    (["net worth", "networth", "total kekayaan",
+      "kekayaan bersih", "nilai bersih"],                            MODEL_SMART, "networth"),
+    (["total aset", "punya apa aja", "semua aset",
+      "kekayaan total"],                                             MODEL_SMART, "assets"),
+    (["kondisi keuangan", "financial health", "gimana keuangan",
+      "review keuangan", "cek keuangan", "keseluruhan",
+      "financial overview"],                                         MODEL_SMART, "full_finance"),
+    # -------------------------------------------------------
+    # 3. INVESTASI (sebelum market agar "untung rugi" ga ke-grab saham)
+    # -------------------------------------------------------
+    (["p&l", "profit loss", "untung rugi", "unrealized",
+      "return invest", "gain invest", "loss invest",
+      "portfolio pl", "roi invest"],                                 MODEL_SMART, "invest_pl"),
+    (["portfolio", "investasi gua", "invest gua", "kondisi invest",
+      "posisi invest", "aset invest", "reksadana", "emas invest"],   MODEL_SMART, "invest_market"),
+    # -------------------------------------------------------
+    # 4. PERBANDINGAN (sebelum expense biar "pengeluaran vs" ga ke-grab)
+    # -------------------------------------------------------
+    (["banding", "compare", "vs bulan", "bulan lalu vs",
+      "month over month", "naik turun pengeluaran",
+      "tren pengeluaran", "pengeluaran vs"],                         MODEL_SMART, "expenses_mom"),
+    # -------------------------------------------------------
+    # 5. FINANCE READ
+    # -------------------------------------------------------
+    (["saldo", "rekening", "duit di bank", "terdiri dari",
+      "rincian rekening", "per bank", "breakdown bank",
+      "update saldo"],                                               MODEL_FAST,  "bank"),
+    ([" cc ", "kartu kredit", "credit card", "tagihan cc",
+      "due date", "limit cc", "outstanding cc", "utilization cc",
+      "bayar cc", "cicilan cc"],                                     MODEL_FAST,  "cc"),
+    (["cicilan", "kpr", "kta", "pinjaman", "angsuran",
+      "hutang", "lunas", "tenor", "sisa hutang",
+      "outstanding loan"],                                           MODEL_FAST,  "loan"),
+    (["budget", "over budget", "alokasi", "sisa budget",
+      "limit belanja"],                                              MODEL_FAST,  "budget"),
+    (["pengeluaran", "expense", "belanja", "habis berapa",
+      "keluar", "spending"],                                         MODEL_FAST,  "expense"),
+    (["income", "pemasukan", "gaji", "salary",
+      "penghasilan"],                                                MODEL_FAST,  "income"),
+    (["dti", "debt to income", "cash flow", "cashflow",
+      "savings rate", "tabungan bulanan"],                           MODEL_FAST,  "summary"),
+    (["catat", "tambah transaksi", "record transaksi",
+      "masukin transaksi", "input transaksi"],                      MODEL_FAST,  "trx_write"),
+    (["histori transaksi", "list transaksi", "riwayat transaksi",
+      "mutasi rekening", " mutasi "],                               MODEL_FAST,  "trx_read"),
+    # -------------------------------------------------------
+    # 6. PIUTANG & ASET TETAP
+    # -------------------------------------------------------
+    (["piutang", "receivable", "pinjamin orang", "tagih orang",
+      "utang ke gua", "belum dibayar", "siapa yang hutang",
+      "siapa yang belum bayar", "nyatain"],                          MODEL_FAST,  "receivables"),
+    (["aset tetap", "properti", "kendaraan", "rumah gua",
+      "mobil gua", "fixed asset", "depresiasi", "book value",
+      "inventaris"],                                                 MODEL_FAST,  "fixed_assets"),
+    # -------------------------------------------------------
+    # 7. MARKET (after finance to avoid grabbing finance queries)
+    # -------------------------------------------------------
+    (["kurs", "nilai tukar", "exchange rate",
+      "dollar berapa", "usd idr", "eur idr"],                       MODEL_FAST,  "market_fx"),
+    (["analisis saham", "technical analysis", "ta saham", " ta ",
+      " rsi ", " ema ", "stoch", "teknikal",
+      "support resistance", "bullish", "bearish", "trend saham"],   MODEL_SMART, "market_ta"),
+    (["saham", "stock", "ihsg", "idx", "spx", "etf",
+      "bbca", "tlkm", "bbri", "bmri", "aapl", "msft",
+      "harga saham"],                                               MODEL_SMART, "market_stock"),
+    (["crypto", "bitcoin", "ethereum", "solana", "kripto",
+      "altcoin", "defi", "nft", "harga btc", "harga eth",
+      " btc ", " eth ", " sol ", " bnb ", " xrp "],                MODEL_SMART, "market_crypto"),
+    (["berita pasar", "berita market", "market news", "market update",
+      "headline", "sentimen pasar", "news hari ini", "berita hari ini",
+      "update pasar", "update market"],                             MODEL_SMART, "market_news"),
+    (["emas", "gold", "xau", "reksadana"],                          MODEL_SMART, "invest_market"),
+    # -------------------------------------------------------
+    # 8. DAILY BRIEF
+    # -------------------------------------------------------
+    (["brief", "pagi ini", "morning brief", "daily brief",
+      "rangkuman harian"],                                          MODEL_SMART, "all"),
 ]
 
 # Confirmation keywords
-CONFIRM_WORDS = {"ya", "iya", "yes", "ok", "oke", "benar", "betul", "lanjut", "confirm", "setuju", "jalan"}
-CANCEL_WORDS  = {"tidak", "ga", "gak", "nggak", "batal", "cancel", "no", "stop", "jangan"}
+CONFIRM_WORDS = {"ya", "iya", "yes", "ok", "oke", "okay", "benar", "bener", "betul",
+                 "beneran", "lanjut", "confirm", "setuju", "jalan", "gas", "gass",
+                 "fix", "siap", "yoi", "yep", "yup", "deal", "mantap", "mantep"}
+CANCEL_WORDS  = {"tidak", "ga", "gak", "nggak", "ngga", "batal", "cancel",
+                 "no", "stop", "jangan", "gausah", "skip"}
 
 # Tool group mapping
 TOOL_GROUPS: dict = {}  # filled after TOOLS is defined
 
+# ============================================================
+# COMPOUND INSTRUCTION DETECTOR
+# ============================================================
+# Write-action trigger words — tiap kata ini = 1 operasi tulis
+_WRITE_TRIGGERS = [
+    "catat", "input transaksi", "masukin", "record transaksi",
+    "tambah transaksi", "hapus transaksi", "delete transaksi",
+    "edit transaksi", "koreksi transaksi", "ganti transaksi",
+    "tambah rekening", "tambah bank", "hapus bank", "edit bank",
+    "tambah cc", "hapus cc", "edit cc", "tambah kartu",
+    "tambah investasi", "hapus investasi", "edit investasi",
+    "tambah pinjaman", "hapus pinjaman", "edit loan",
+    "set budget", "ubah budget", "hapus budget", "tambah budget", "tambah kategori",
+    "update saldo", "update kpr", "update kta",
+]
+_COMPOUND_CONNECTORS = [
+    " dan ", " juga ", " sekalian ", " sekaligus ", " plus ",
+    " terus ", " lalu ", " kemudian ", " sama "
+]
+
+def _is_compound(lower: str) -> bool:
+    """Return True jika user minta 2+ write operations dalam satu pesan."""
+    import re
+    padded = f" {lower} "
+    found = [w for w in _WRITE_TRIGGERS if w in padded]
+    if len(found) >= 2:
+        return True
+    # 1 action + connector → kemungkinan compound
+    if len(found) == 1 and any(c in padded for c in _COMPOUND_CONNECTORS):
+        return True
+    # Batch transaction heuristic: 3+ amounts dalam satu pesan (contoh: "kopi 35rb, makan 85rb, grab 25rb")
+    amounts = re.findall(r'\d+\s*(?:rb|jt|ribu|juta|k\b)', lower)
+    if len(amounts) >= 3:
+        return True
+    return False
+
 def route(text: str, history: list = None):
     """Return (model, list_of_tools) for a given user message."""
-    lower = text.lower().strip().rstrip("!?.").strip()
+    raw_lower = text.lower().strip().rstrip("!?.").strip()
+    # Pad with spaces → " rsi ", " ta " match at any position without false positives
+    # e.g. "rsi btc" → " rsi btc " matches " rsi "; "bersih" → " bersih " won't match " rsi "
+    lower = f" {raw_lower} "
 
     # Detect confirmation/cancellation of pending write action
-    if lower in CONFIRM_WORDS or lower in CANCEL_WORDS:
-        # Check if last assistant message was asking for confirmation
+    if raw_lower in CONFIRM_WORDS or raw_lower in CANCEL_WORDS:
         if history:
             last_asst = next((m["content"] for m in reversed(history) if m["role"] == "assistant"), "")
             if any(w in last_asst.lower() for w in ["bener?", "konfirmasi", "confirm", "lanjut?", "pastiin"]):
                 return MODEL_FAST, TOOL_GROUPS.get("all_write", TOOLS)
+
+    # Compound instruction → beri semua tools agar bisa eksekusi sequential
+    if _is_compound(raw_lower):
+        return MODEL_SMART, TOOL_GROUPS.get("all", TOOLS)
 
     for keywords, model, group in INTENT_RULES:
         if any(k in lower for k in keywords):
@@ -177,43 +235,44 @@ MAX_TOOL_RESULT = 4000  # Max chars per tool result
 # ============================================================
 # SYSTEM PROMPT
 # ============================================================
-SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI assistant.
+SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI assistant for Ricky.
 
 ## CRITICAL RULE — WAJIB TANPA EXCEPTION
 **JANGAN PERNAH menjawab pertanyaan keuangan dari memori atau asumsi.**
-**SELALU panggil tool yang sesuai TERLEBIH DAHULU, baru jawab berdasarkan data yang dikembalikan.**
+**SELALU panggil tool yang sesuai TERLEBIH DAHULU, baru jawab berdasarkan data.**
 Kalau tool belum dipanggil = JANGAN jawab angka apapun.
 
 ## Finance Rules — Tool Selection
-- Saldo bank / cash / rekening?   → get_banks()
-- Kartu kredit / CC / tagihan?    → get_credit_cards()
-- Investasi / portfolio?          → get_investments() atau get_investment_pl()
-- Cicilan / hutang / KPR/KTA?     → get_loans()
-- Budget vs actual / over budget? → get_budgets()
-- Pengeluaran detail?             → get_expenses(month)
-- Pemasukan / income?             → get_income(month)
+- Saldo bank / cash / rekening?          → get_banks()
+- Kartu kredit / CC / tagihan?           → get_credit_cards()
+- Investasi / portfolio?                 → get_investments() atau get_investment_pl()
+- Cicilan / hutang / KPR/KTA?            → get_loans()
+- Budget vs actual / over budget?        → get_budgets()
+- Pengeluaran detail?                    → get_expenses(month)
+- Pemasukan / income?                    → get_income(month)
 - Net worth / DTI / cash flow / summary? → get_summary()
-- Histori transaksi?              → get_transactions()
-- Catat transaksi?                → KONFIRMASI DULU → add_transaction()
-- Update saldo?                   → update_bank_balance()
-- Numbers: Rp 15,000,000 format (not 15000000)
+- Histori / list transaksi?              → get_transactions()
+- Catat transaksi baru?                  → KONFIRMASI DULU → add_transaction()
+- Edit/hapus transaksi lama?             → KONFIRMASI DULU → manage_transaction()
+- Update saldo bank?                     → KONFIRMASI DULU → update_bank_balance()
+- CRUD rekening/CC/investasi/loan/budget → KONFIRMASI DULU → manage_*()
+- Numbers: format Rp 15,000,000 (bukan 15000000)
 - Lead with number/insight. Short & direct.
 - Flag risks ⚠️, positives ✅
 - Tables when comparing multiple items
 
 ## Market Rules
-- Call get_market_data for stock/IHSG/SPX/ETF questions
-- Call get_crypto_prices for quick price check (current price, 24h change, market cap)
-- For crypto TECHNICAL ANALYSIS (support/resistance, trend, candles): use get_market_data with yfinance tickers: BTC-USD, ETH-USD, SOL-USD, BNB-USD, XRP-USD, ADA-USD
-- Call get_fx_rates for currency/FX questions
-- Call get_news for market news or exposure analysis
-- Support/resistance: use recent 3mo OHLC data, identify key price levels from highs/lows
-- When presenting technical analysis, always show all 4 indicators in this format:
-  📊 EMA → trend direction (bullish/bearish/mixed), price vs EMA9/21/50
-  📉 RSI → value + overbought/oversold/neutral signal
-  🎯 STOCH → K/D values + overbought/oversold + bullish/bearish cross
-  😨 FEAR & GREED → index value + label (Extreme Fear/Fear/Neutral/Greed/Extreme Greed)
-- Always state data is for information only, not financial advice
+- Saham/IHSG/SPX/ETF?       → get_market_data()
+- Harga crypto cepat?        → get_crypto_prices()
+- Crypto technical analysis? → get_market_data() dengan tickers: BTC-USD, ETH-USD, SOL-USD
+- Kurs FX?                   → get_fx_rates()
+- Berita pasar?              → get_news()
+- Technical analysis format (SELALU tampilkan semua 4):
+  📊 EMA → trend direction + price vs EMA9/21/50
+  📉 RSI → value + overbought/oversold/neutral
+  🎯 STOCH → K/D values + overbought/oversold + cross direction
+  😨 FEAR & GREED → index value + label
+- Data market = informasi saja, bukan rekomendasi investasi
 
 ## Key Metrics
 - Net Worth = Total Assets − Total Liabilities
@@ -221,26 +280,126 @@ Kalau tool belum dipanggil = JANGAN jawab angka apapun.
 - CC Utilization = Outstanding ÷ Limit (alert >70%)
 - Cash Flow = Income − (Cash Expenses + CC Usage)
 
-## Confirmation Rules (WAJIB untuk semua write operations)
-Sebelum eksekusi add_transaction, manage_bank, manage_creditcard, manage_investment, manage_loan, manage_budget, update_bank_balance — SELALU tampilkan konfirmasi dulu:
+## ── TONE & STYLE — WAJIB ──
+Lo adalah Edith, PA finansial Ricky. Ngobrol kayak temen deket yang ngerti keuangan.
+- Bahasa: casual Indo-English campur, Jaksel style (gua/lo)
+- Jangan kaku, jangan template robot
+- Singkat & to the point — lead with angka atau insight
+- Kalau ada info yang kurang → tanya dengan natural, jangan langsung tampil form kosong
 
-Untuk transaksi:
-"Mau catat nih:
-📋 Tipe: [In/Out/Transfer]
-💰 Amount: Rp X,XXX,XXX
-📂 Kategori: [kategori]
-🏦 Account: [rekening]
-📝 Desc: [deskripsi]
-📅 Tanggal: [tanggal]
+## ── CONFIRMATION RULES (WAJIB untuk SEMUA write operations) ──
+Sebelum eksekusi write/delete — konfirmasi dulu, tapi dengan gaya natural.
 
-Bener? (ya/tidak)"
+**PENTING: Kalau ada field yang kosong/ga jelas (kategori, deskripsi, tanggal) → TANYA DULU sebelum tampil konfirmasi. Jangan tampilkan konfirmasi dengan field kosong.**
 
-Untuk CRUD entitas lain, tampilkan ringkasan data yang akan diubah/ditambah/dihapus dan tanya konfirmasi.
-Baru eksekusi setelah user balas "ya", "iya", "ok", "lanjut", atau sejenisnya.
-Jika user balas "tidak", "batal", "ga" → cancel, jangan eksekusi tool.
+Contoh konfirmasi transaksi yang bener:
+> "Oke catat nih — transfer keluar Rp 150.000 dari Permata 598, tanggal hari ini. Kategorinya apa? (Financial/Living/dll)"
+
+Setelah semua info lengkap, baru konfirmasi:
+> "Siap dicatet:
+> Rp 150.000 keluar dari Permata 598 · [Kategori] · [tanggal]
+> Gas? (ya/tidak)"
+
+Untuk tambah rekening:
+> "Mau tambahin Permata 4144397598 ke dashboard ya? Nick-nya mau pake apa — Permata 734 atau Permata 598?"
+
+Untuk hapus:
+> "Yakin hapus [nama/ID]? Ga bisa di-undo loh. (ya/tidak)"
+
+Prinsip:
+- Kalau user jawab positif (ya/gas/bener/oke) → eksekusi
+- Kalau negatif (ga/batal/cancel) → "Oke, skip aja"
+- Jangan tampilkan field kosong dalam konfirmasi — tanya dulu
+
+## ── COMPOUND / MULTI-STEP INSTRUCTIONS ──
+Kalau user minta 2+ operasi sekaligus:
+
+1. Parse semua operasi yang diminta
+2. Kalau ada info yang kurang → tanya semua sekaligus sebelum confirm
+3. Konfirmasi semua dalam satu pesan, natural:
+> "Oke gua mau lakuin ini:
+> ① catat transfer keluar Rp 150k dari Permata 598
+> ② tambah rekening Permata 4144397598 ke dashboard
+> Lanjut semua? (ya/tidak)"
+4. Setelah confirm → eksekusi satu-satu, report hasilnya:
+> "Done!
+> ✅ Transaksi Rp 150k tercatat
+> ✅ Rekening Permata 598 ditambahkan
+> ❌ [operasi x] gagal — [kenapa, solusi singkat]"
+5. Kalau satu gagal → lanjut yang lain, jangan stop
+
+Contoh compound yang harus bisa handle:
+- "catat makan 75rb BCA dan parkir 10rb cash" → 2 transaksi
+- "input kopi 35rb, makan 85rb, grab 25rb semua BCA" → 3 transaksi batch
+- "hapus transaksi t72 ganti dengan makan 85rb BCA tgl 26 Jun" → delete + add
+- "tambah rekening Jago dan catat saldo awal 5jt" → create bank + transaction
+- "update saldo BCA 5jt dan Mandiri 3jt" → 2 balance updates
+- "set budget makan 3jt dan transport 1.5jt" → 2 budget updates
+
+## ── ERROR HANDLING ──
+Kalau tool return error — jangan kasih raw JSON error. Jelasin dengan bahasa natural:
+
+- Server mati → "Eh server finance-nya lagi mati nih. Lo perlu jalanin `node backend/server.js` dari Terminal dulu."
+- Data ga ketemu (404) → "Rekening/transaksi/CC '[x]' ga ketemu di database. Cek dulu yang terdaftar ya."
+- Data invalid (400) → "Ada yang ga valid nih — tanggal harus format YYYY-MM-DD, amount harus angka."
+- Market error → "Data market untuk '[ticker]' ga available sekarang. Coba ticker lain atau cek internet."
+- Rate limit → "Groq API lagi overload, tunggu 30 detik dulu ya baru coba lagi."
+- Unknown → "Ada error teknis: [ringkasan error]. Coba lagi atau ping gua."
+
+## ── CARA PIKIR — INI YANG PALING PENTING ──
+
+Lo bukan sekedar bot yang baca database. Lo PA finansial yang ngerti context dan mikirin kepentingan Ricky.
+
+**Sebelum jawab, selalu pikir:**
+1. Apa yang sebenernya ditanya? (bukan cuma literal pertanyaannya)
+2. Data apa yang relevan? (panggil tool yang tepat)
+3. Apa insight-nya? (jangan cuma tampil angka mentah)
+4. Ada yang perlu di-flag? (risiko, anomali, peluang)
+5. Ada follow-up yang useful? (anticipate next question)
+
+**Cara jawab yang bener:**
+- Lead dengan angka/insight utama, bukan intro basa-basi
+- Kasih konteks: "5jt di BCA itu cukup buat ~2 bulan pengeluaran lo yang rata-rata 2.5jt/bln"
+- Connect the dots: kalau saldo turun + CC naik → flagging cash flow squeeze
+- Bedain penting vs ga penting — highlight yang material, skip yang trivial
+- Kalau ada anomali → proaktif flag, jangan tunggu ditanya
+
+**Contoh cara pikir yang SALAH vs BENER:**
+
+❌ SALAH (robot mode):
+User: "networth gua berapa?"
+Edith: "Net worth Anda adalah Rp X. Total aset Rp Y. Total liabilitas Rp Z."
+
+✅ BENER (PA mode):
+User: "networth gua berapa?"
+Edith: "Net worth lo Rp 1.2M. Naik 50jt dari bulan lalu karena saldo BCA lo naik. Tapi ⚠️ CC utilization lo 78% — mau gua ingetin bayar sebelum due date [tanggal]?"
+
+---
+
+❌ SALAH:
+User: "pengeluaran bulan ini?"
+Edith: "Total pengeluaran Rp 8.500.000. Kategori: Meals Rp 2.1jt, Transport Rp 800rb..."
+
+✅ BENER:
+User: "pengeluaran bulan ini?"
+Edith: "8.5jt udah keluar bulan ini — masih 8 hari lagi. Meals lo 2.1jt (⚠️ udah 105% dari budget 2jt). Transport oke, 800rb dari limit 1jt. Kalau pace ini lanjut, lo bakal tutup bulan di ~10.5jt vs income 15jt → savings rate ~30%. Masih aman sih."
+
+---
+
+**Proactive flags — kalau lihat ini, langsung mention tanpa ditanya:**
+- CC utilization > 70% → ingetin + kasih due date
+- DTI > 30% → flag risiko
+- Saldo bank < 1x monthly expense → cash flow warning
+- Pengeluaran kategori > budget → over budget alert
+- Investasi unrealized loss > 10% → mention tapi jangan panik
+- Ada idle cash > 3 bulan expenses → saranin alokasi
+
+**Kalau data kurang / ambigu:**
+- Tanya SATU pertanyaan yang paling krusial, bukan list 5 pertanyaan
+- Tebak yang paling masuk akal dulu, konfirmasi ke user: "gua asumsiin ini [X], bener ga?"
 
 ## Language
-Match user's language naturally (Indonesian/English/mixed Jaksel style is fine)"""
+Casual Indo-English mix, Jaksel style (gua/lo). Smart tapi ga sok formal. Kayak temen yang kebetulan jago finance."""
 
 # ============================================================
 # TOOLS DEFINITION (OpenAI format — granular per package)
@@ -1226,42 +1385,102 @@ if (typeof window !== 'undefined') {{
 
 
 # ============================================================
+# ERROR CONTEXT ENRICHER
+# ============================================================
+def _enrich_error(result: str, tool_name: str, args: dict) -> str:
+    """
+    Kalau tool return error, tambahkan konteks human-readable
+    supaya Edith bisa jelaskan ke user dengan benar.
+    """
+    try:
+        data = json.loads(result)
+        if "error" not in data:
+            return result
+        err = str(data["error"]).lower()
+
+        # Determine friendly context
+        if "connection" in err or "refused" in err or "econnrefused" in err:
+            context = "Server finance (localhost:3000) tidak bisa dihubungi"
+            solution = "Jalankan `node backend/server.js` dari Terminal"
+        elif "404" in err or "not found" in err:
+            entity = tool_name.replace("exec_manage_", "").replace("exec_get_", "")
+            key = args.get("nick") or args.get("name") or args.get("id") or args.get("ticker") or args.get("loanType") or args.get("category") or "?"
+            context = f"Data '{key}' tidak ditemukan di database"
+            if "bank" in tool_name:
+                solution = "Cek nama rekening yang terdaftar dengan: 'rekening gua apa aja?'"
+            elif "transaction" in tool_name:
+                solution = "Minta histori transaksi dulu untuk lihat ID yang valid: 'histori transaksi gua'"
+            elif "creditcard" in tool_name or "cc" in tool_name:
+                solution = "Cek CC yang terdaftar: 'CC gua apa aja?'"
+            elif "investment" in tool_name:
+                solution = "Cek investasi terdaftar: 'portfolio gua'"
+            else:
+                solution = f"Pastikan data '{key}' sudah ada sebelum di-edit/hapus"
+        elif "400" in err or "invalid" in err or "required" in err:
+            context = "Data yang dikirim tidak valid atau tidak lengkap"
+            solution = "Cek: tanggal harus YYYY-MM-DD, amount harus angka, field wajib tidak boleh kosong"
+        elif "yfinance" in err or "no data" in err or "no timezone" in err:
+            ticker = args.get("tickers", ["?"])[0] if isinstance(args.get("tickers"), list) else "?"
+            context = f"Data market untuk '{ticker}' tidak tersedia"
+            solution = "Coba ticker yang berbeda atau cek koneksi internet"
+        elif "rate limit" in err or "429" in err:
+            context = "API rate limit tercapai"
+            solution = "Tunggu 30-60 detik lalu coba lagi"
+        elif "timeout" in err:
+            context = "Request timeout — koneksi lambat atau server tidak responsif"
+            solution = "Coba lagi dalam beberapa detik"
+        else:
+            context = f"Error teknis pada {tool_name}"
+            solution = "Coba lagi atau cek apakah server dan koneksi internet berjalan normal"
+
+        data["_error_context"] = {
+            "tool": tool_name,
+            "context": context,
+            "solution": solution
+        }
+        return json.dumps(data, ensure_ascii=False)
+    except Exception:
+        return result
+
+
+# ============================================================
 # TOOL DISPATCHER
 # ============================================================
 def execute_tool(name: str, args: dict) -> str:
     logger.info(f"🔧 {name}({args})")
+
     if name == "get_banks":
-        return exec_get_banks()
+        result = exec_get_banks()
     elif name == "get_credit_cards":
-        return exec_get_credit_cards()
+        result = exec_get_credit_cards()
     elif name == "get_investments":
-        return exec_get_investments()
+        result = exec_get_investments()
     elif name == "get_loans":
-        return exec_get_loans()
+        result = exec_get_loans()
     elif name == "get_budgets":
-        return exec_get_budgets()
+        result = exec_get_budgets()
     elif name == "get_expenses":
-        return exec_get_expenses(month=args.get("month", ""))
+        result = exec_get_expenses(month=args.get("month", ""))
     elif name == "get_income":
-        return exec_get_income(month=args.get("month", ""))
+        result = exec_get_income(month=args.get("month", ""))
     elif name == "get_summary":
-        return exec_get_summary()
+        result = exec_get_summary()
     elif name == "get_receivables":
-        return exec_get_receivables()
+        result = exec_get_receivables()
     elif name == "get_fixed_assets":
-        return exec_get_fixed_assets()
+        result = exec_get_fixed_assets()
     elif name == "get_expenses_compare":
-        return exec_get_expenses_compare(month1=args.get("month1",""), month2=args.get("month2",""))
+        result = exec_get_expenses_compare(month1=args.get("month1",""), month2=args.get("month2",""))
     elif name == "get_investment_pl":
-        return exec_get_investment_pl()
+        result = exec_get_investment_pl()
     elif name == "get_transactions":
-        return exec_get_transactions(
+        result = exec_get_transactions(
             month=args.get("month", ""),
             category=args.get("category", ""),
             limit=args.get("limit", 50)
         )
     elif name == "add_transaction":
-        return exec_add_transaction(
+        result = exec_add_transaction(
             date_str=args.get("date", date.today().isoformat()),
             trx_type=args.get("type", "Out"),
             category=args.get("category", ""),
@@ -1270,36 +1489,36 @@ def execute_tool(name: str, args: dict) -> str:
             desc=args.get("desc", "")
         )
     elif name == "update_bank_balance":
-        return exec_update_bank_balance(
+        result = exec_update_bank_balance(
             nick=args.get("nick", ""),
             balance=args.get("balance", 0)
         )
     elif name == "get_market_data":
-        return exec_get_market_data(
+        result = exec_get_market_data(
             tickers=args.get("tickers", ["^JKSE", "^GSPC"]),
             period=args.get("period", "3mo")
         )
     elif name == "get_crypto_prices":
-        return exec_get_crypto_prices(coins=args.get("coins"))
+        result = exec_get_crypto_prices(coins=args.get("coins"))
     elif name == "get_fx_rates":
-        return exec_get_fx_rates()
+        result = exec_get_fx_rates()
     elif name == "get_news":
-        return exec_get_news(limit=args.get("limit", 10))
+        result = exec_get_news(limit=args.get("limit", 10))
     elif name == "manage_bank":
-        return exec_manage_bank(
+        result = exec_manage_bank(
             action=args.get("action"), nick=args.get("nick"),
             name=args.get("name"), cat=args.get("cat"), type_=args.get("type"),
             acct=args.get("acct"), balance=args.get("balance"), notes=args.get("notes")
         )
     elif name == "manage_creditcard":
-        return exec_manage_creditcard(
+        result = exec_manage_creditcard(
             action=args.get("action"), name=args.get("name"),
             issuer=args.get("issuer"), limit=args.get("limit"),
             outstanding=args.get("outstanding"), due_date=args.get("dueDate"),
             notes=args.get("notes")
         )
     elif name == "manage_investment":
-        return exec_manage_investment(
+        result = exec_manage_investment(
             action=args.get("action"), ticker=args.get("ticker"),
             platform=args.get("platform"), type_=args.get("type"),
             qty=args.get("qty"), avg_buy=args.get("avgBuy"),
@@ -1308,26 +1527,29 @@ def execute_tool(name: str, args: dict) -> str:
             notes=args.get("notes")
         )
     elif name == "manage_loan":
-        return exec_manage_loan(
+        result = exec_manage_loan(
             action=args.get("action"), loan_type=args.get("loanType"),
             lender=args.get("lender"), remaining=args.get("remaining"),
             monthly=args.get("monthly"), rate=args.get("rate"),
             tenor=args.get("tenor"), notes=args.get("notes")
         )
     elif name == "manage_budget":
-        return exec_manage_budget(
+        result = exec_manage_budget(
             action=args.get("action"), category=args.get("category"),
             amount=args.get("amount")
         )
     elif name == "manage_transaction":
-        return exec_manage_transaction(
+        result = exec_manage_transaction(
             action=args.get("action"), trx_id=args.get("id"),
             date_str=args.get("date"), type_=args.get("type"),
             category=args.get("category"), account=args.get("account"),
             amount=args.get("amount"), desc=args.get("desc")
         )
     else:
-        return json.dumps({"error": f"Unknown tool: {name}"})
+        result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
+
+    # Semua hasil dilewatkan ke error enricher → friendly context kalau ada error
+    return _enrich_error(result, name, args)
 
 # ============================================================
 # GROQ AGENTIC LOOP (OpenAI-compatible)
