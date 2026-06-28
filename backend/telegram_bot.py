@@ -48,29 +48,42 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MODEL_FAST    = "llama-3.1-8b-instant"     # simple queries < 1 detik
 MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
 
-SIMPLE_KEYWORDS = [
-    "saldo", "berapa", "balance", "mutasi", "catat", "tambah", "hapus",
-    "update", "kurs", "fx", "transfer", "bayar", "topup", "cicilan"
-]
-COMPLEX_KEYWORDS = [
-    "analisis", "analysis", "ta ", "rsi", "ema", "stoch", "portfolio",
-    "review", "rekomendasi", "recommend", "saham", "crypto", "bitcoin",
-    "ihsg", "spx", "trend", "bullish", "bearish", "support", "resistance",
-    "fear", "greed", "news", "brief", "laporan", "market", "teknikal",
-    "teknis", "prediksi", "forecast", "beli", "jual", "posisi"
+# ============================================================
+# ROUTING: model + tool group per intent
+# ============================================================
+INTENT_RULES = [
+    # (keywords, model, tool_group_key)
+    (["saldo", "rekening", "cash", "duit di bank"],            MODEL_FAST,  "bank"),
+    (["cc", "kartu kredit", "credit card", "cicilan cc"],      MODEL_FAST,  "cc"),
+    (["cicilan", "kpr", "kta", "hutang", "pinjaman"],          MODEL_FAST,  "loan"),
+    (["budget", "over budget", "alokasi"],                     MODEL_FAST,  "budget"),
+    (["pengeluaran", "expense", "belanja", "habis berapa"],    MODEL_FAST,  "expense"),
+    (["income", "pemasukan", "gaji", "salary"],                MODEL_FAST,  "income"),
+    (["net worth", "summary", "overview", "kondisi", "health"],MODEL_FAST,  "summary"),
+    (["catat", "tambah transaksi", "input transaksi"],         MODEL_FAST,  "trx_write"),
+    (["transaksi", "histori", "mutasi"],                       MODEL_FAST,  "trx_read"),
+    (["kurs", "fx", "dollar", "usd", "eur"],                   MODEL_FAST,  "market_fx"),
+    (["saham", "stock", "ihsg", "idx", "spx", "etf"],         MODEL_SMART, "market_stock"),
+    (["crypto", "bitcoin", "btc", "eth", "sol", "coin"],       MODEL_SMART, "market_crypto"),
+    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal"],   MODEL_SMART, "market_ta"),
+    (["news", "berita", "market update"],                      MODEL_SMART, "market_news"),
+    (["portfolio", "investasi", "reksadana", "emas"],          MODEL_SMART, "investment"),
+    (["tambah bank", "hapus bank", "edit bank"],               MODEL_FAST,  "crud_bank"),
+    (["brief", "pagi", "morning"],                             MODEL_SMART, "all"),
 ]
 
-def route_model(text: str) -> str:
-    """Classify complexity → return model name."""
+# Tool group mapping
+TOOL_GROUPS: dict = {}  # filled after TOOLS is defined
+
+def route(text: str):
+    """Return (model, list_of_tools) for a given user message."""
     lower = text.lower()
-    # Complex keywords take priority
-    if any(k in lower for k in COMPLEX_KEYWORDS):
-        return MODEL_SMART
-    # Simple if matches simple keywords
-    if any(k in lower for k in SIMPLE_KEYWORDS):
-        return MODEL_FAST
-    # Default: smart (safer for unknown queries)
-    return MODEL_SMART
+    for keywords, model, group in INTENT_RULES:
+        if any(k in lower for k in keywords):
+            tools = TOOL_GROUPS.get(group, TOOLS)
+            return model, tools
+    # Default: summary + smart model
+    return MODEL_FAST, TOOL_GROUPS.get("summary", TOOLS)
 
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
 ALLOWED_USER_IDS = []
@@ -454,6 +467,29 @@ TOOLS = [
         }
     }
 ]
+
+def _tools(*names):
+    return [t for t in TOOLS if t["function"]["name"] in names]
+
+TOOL_GROUPS = {
+    "bank":         _tools("get_banks", "update_bank_balance"),
+    "cc":           _tools("get_credit_cards"),
+    "loan":         _tools("get_loans"),
+    "budget":       _tools("get_budgets"),
+    "expense":      _tools("get_expenses"),
+    "income":       _tools("get_income"),
+    "summary":      _tools("get_summary"),
+    "trx_read":     _tools("get_transactions"),
+    "trx_write":    _tools("add_transaction"),
+    "market_fx":    _tools("get_fx_rates"),
+    "market_stock": _tools("get_market_data", "get_fx_rates"),
+    "market_crypto":_tools("get_crypto_prices", "get_market_data"),
+    "market_ta":    _tools("get_market_data", "get_crypto_prices"),
+    "market_news":  _tools("get_news"),
+    "investment":   _tools("get_investments", "get_market_data"),
+    "crud_bank":    _tools("manage_bank"),
+    "all":          TOOLS,
+}
 
 # ============================================================
 # TOOL EXECUTORS
@@ -1021,7 +1057,7 @@ def execute_tool(name: str, args: dict) -> str:
 # ============================================================
 # GROQ AGENTIC LOOP (OpenAI-compatible)
 # ============================================================
-def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
+def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) -> str:
     if not GROQ_API_KEY:
         return "❌ GROQ_API_KEY belum diset. Tambahkan ke backend/.env"
 
@@ -1030,6 +1066,7 @@ def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
         "Content-Type": "application/json"
     }
     current = messages.copy()
+    active_tools = tools if tools else TOOL_GROUPS.get("summary", TOOLS)
     # Fallback: if 70B hits rate limit, retry with 8B
     models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
@@ -1037,7 +1074,7 @@ def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
         payload = {
             "model":       models_to_try[0],
             "messages":    current,
-            "tools":       TOOLS,
+            "tools":       active_tools,
             "tool_choice": "auto",
             "temperature": 0.3,
             "max_tokens":  1024
@@ -1390,10 +1427,10 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         typing_task = asyncio.create_task(keep_typing())
         try:
-            model = route_model(text)
-            logger.info(f"🧠 Model: {model}")
+            model, tools = route(text)
+            logger.info(f"🧠 Model: {model} | Tools: {[t['function']['name'] for t in tools]}")
             response = await asyncio.get_event_loop().run_in_executor(
-                None, chat_with_groq, messages, model
+                None, chat_with_groq, messages, model, tools
             )
         finally:
             typing_task.cancel()
