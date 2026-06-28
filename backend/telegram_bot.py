@@ -86,11 +86,19 @@ MAX_TOOL_RESULT = 4000  # Max chars per tool result
 # ============================================================
 SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI assistant.
 
-## Finance Rules
-- ALWAYS call get_finance_data before answering about balances, net worth, expenses, or financial health
-- Call get_transactions when user asks about spending details or transaction history
-- Call add_transaction when user wants to record a new transaction
-- Call update_bank_balance when user wants to update a bank balance
+## Finance Rules — Tool Selection (PENTING: panggil yang paling spesifik)
+- Saldo bank / cash?          → get_banks()
+- Kartu kredit / CC?          → get_credit_cards()
+- Investasi / portfolio?      → get_investments()
+- Cicilan / hutang / KPR/KTA? → get_loans()
+- Budget vs actual?           → get_budgets()
+- Pengeluaran detail?         → get_expenses(month)
+- Pemasukan / income?         → get_income(month)
+- Net worth / summary / DTI / CF? → get_summary()
+- Histori transaksi detail?   → get_transactions(month, category)
+- Catat transaksi baru?       → add_transaction(...)
+- Update saldo bank?          → update_bank_balance(nick, balance)
+- JANGAN panggil lebih dari yang dibutuhkan!
 - Numbers: Rp 15,000,000 format (not 15000000)
 - Lead with number/insight, then explain. Short & direct.
 - Flag risks ⚠️, positives ✅
@@ -120,15 +128,83 @@ SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI 
 Match user's language naturally (Indonesian/English/mixed Jaksel style is fine)"""
 
 # ============================================================
-# TOOLS DEFINITION (Ollama / OpenAI format)
+# TOOLS DEFINITION (OpenAI format — granular per package)
 # ============================================================
 TOOLS = [
-    # --- Finance ---
+    # --- Finance READ (granular) ---
     {
         "type": "function",
         "function": {
-            "name": "get_finance_data",
-            "description": "Ambil snapshot keuangan lengkap: saldo bank, CC, pinjaman, investasi, aset tetap, piutang, budget, dan transaksi bulan ini. Wajib dipanggil sebelum menjawab pertanyaan keuangan.",
+            "name": "get_banks",
+            "description": "Ambil saldo semua rekening bank. Panggil HANYA untuk pertanyaan tentang saldo, cash, atau rekening bank.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_credit_cards",
+            "description": "Ambil data kartu kredit: outstanding, limit, due date, utilization. Panggil HANYA untuk pertanyaan CC.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_investments",
+            "description": "Ambil portfolio investasi: saham, crypto, reksa dana, emas. Panggil HANYA untuk pertanyaan investasi/portfolio.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_loans",
+            "description": "Ambil data pinjaman: KPR, KTA, outstanding, cicilan bulanan. Panggil HANYA untuk pertanyaan hutang/cicilan.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_budgets",
+            "description": "Ambil budget per kategori vs actual bulan ini. Panggil untuk pertanyaan budget, over budget, atau alokasi pengeluaran.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_expenses",
+            "description": "Ambil transaksi pengeluaran (Out) dengan breakdown per kategori.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "month": {"type": "string", "description": "Format YYYY-MM, e.g. 2026-06. Default: bulan ini."}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_income",
+            "description": "Ambil transaksi pemasukan (In) bulan tertentu.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "month": {"type": "string", "description": "Format YYYY-MM. Default: bulan ini."}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_summary",
+            "description": "Ambil ringkasan keuangan: net worth, DTI, CC utilization, cash flow, total assets/liabilities. Panggil untuk pertanyaan overview, net worth, atau health check keuangan.",
             "parameters": {"type": "object", "properties": {}, "required": []}
         }
     },
@@ -136,13 +212,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_transactions",
-            "description": "Ambil histori transaksi dengan filter opsional.",
+            "description": "Ambil histori transaksi detail dengan filter. Panggil HANYA jika user butuh list transaksi spesifik.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "month":    {"type": "string",  "description": "Format YYYY-MM, e.g. 2026-06"},
                     "category": {"type": "string",  "description": "Nama kategori, e.g. Meals, Transportation"},
-                    "limit":    {"type": "integer", "description": "Max transaksi (default 50)"}
+                    "limit":    {"type": "integer", "description": "Max transaksi (default 20)"}
                 },
                 "required": []
             }
@@ -383,27 +459,61 @@ TOOLS = [
 # TOOL EXECUTORS
 # ============================================================
 
-def exec_get_finance_data() -> str:
+def exec_get_banks() -> str:
     try:
-        resp = requests.get(f"{FINANCE_URL}/api/data", timeout=10)
-        raw = resp.json()
-        today = dt.datetime.now().strftime("%Y-%m")
-        monthly_trx = [t for t in raw.get("transactions", []) if t.get("date", "").startswith(today)]
-        summary = {
-            "lastUpdated": raw.get("lastUpdated"),
-            "fxRate": raw.get("fxRate"),
-            "banks": raw.get("banks", []),
-            "creditCards": raw.get("creditCards", []),
-            "loans": raw.get("loans", []),
-            "investments": raw.get("investments", []),
-            "fixedAssets": raw.get("fixedAssets", []),
-            "receivables": raw.get("receivables", []),
-            "budgets": raw.get("budgets", {}),
-            "income": raw.get("income", {}),
-            "transactionsThisMonth": monthly_trx,
-            "totalTransactions": len(raw.get("transactions", []))
-        }
-        return json.dumps(summary, ensure_ascii=False)
+        resp = requests.get(f"{FINANCE_URL}/api/banks", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_credit_cards() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/creditcards", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_investments() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/investments", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_loans() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/loans", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_budgets() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/budgets", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_expenses(month="") -> str:
+    try:
+        params = {"month": month} if month else {}
+        resp = requests.get(f"{FINANCE_URL}/api/expenses", params=params, timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_income(month="") -> str:
+    try:
+        params = {"month": month} if month else {}
+        resp = requests.get(f"{FINANCE_URL}/api/income", params=params, timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_summary() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/summary", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -817,8 +927,22 @@ if (typeof window !== 'undefined') {{
 # ============================================================
 def execute_tool(name: str, args: dict) -> str:
     logger.info(f"🔧 {name}({args})")
-    if name == "get_finance_data":
-        return exec_get_finance_data()
+    if name == "get_banks":
+        return exec_get_banks()
+    elif name == "get_credit_cards":
+        return exec_get_credit_cards()
+    elif name == "get_investments":
+        return exec_get_investments()
+    elif name == "get_loans":
+        return exec_get_loans()
+    elif name == "get_budgets":
+        return exec_get_budgets()
+    elif name == "get_expenses":
+        return exec_get_expenses(month=args.get("month", ""))
+    elif name == "get_income":
+        return exec_get_income(month=args.get("month", ""))
+    elif name == "get_summary":
+        return exec_get_summary()
     elif name == "get_transactions":
         return exec_get_transactions(
             month=args.get("month", ""),

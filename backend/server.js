@@ -116,6 +116,151 @@ app.get('/api/data', (req, res) => {
 });
 
 // ============================================================
+// GET /api/banks — bank balances only
+// ============================================================
+app.get('/api/banks', (req, res) => {
+  try {
+    const banks = db.prepare('SELECT nick, name, cat, type, balance, updated, notes FROM banks').all();
+    const total = banks.reduce((s, b) => s + (b.balance || 0), 0);
+    res.json({ banks, totalCash: total });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/creditcards — CC balances + limits only
+// ============================================================
+app.get('/api/creditcards', (req, res) => {
+  try {
+    const cards = db.prepare('SELECT name, issuer, limit_amt as limit, outstanding, due_date as dueDate, notes FROM credit_cards').all();
+    const totalOutstanding = cards.reduce((s, c) => s + (c.outstanding || 0), 0);
+    const totalLimit = cards.reduce((s, c) => s + (c.limit || 0), 0);
+    res.json({ cards, totalOutstanding, totalLimit, utilization: totalLimit ? Math.round(totalOutstanding / totalLimit * 100) : 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/investments — portfolio only
+// ============================================================
+app.get('/api/investments', (req, res) => {
+  try {
+    const investments = db.prepare('SELECT platform, ticker, type, qty, avg_buy as avgBuy, currency, cost_basis as costBasis, current_price as currentPrice, platform_cash as platformCash, notes FROM investments').all();
+    const totalCost  = investments.reduce((s, i) => s + (i.costBasis || 0), 0);
+    res.json({ investments, totalCostBasis: totalCost });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/loans — cicilan + outstanding
+// ============================================================
+app.get('/api/loans', (req, res) => {
+  try {
+    const loans = db.prepare('SELECT type, lender, remaining, monthly, rate, tenor, notes FROM loans').all();
+    const totalRemaining = loans.reduce((s, l) => s + (l.remaining || 0), 0);
+    const totalMonthly   = loans.reduce((s, l) => s + (l.monthly || 0), 0);
+    res.json({ loans, totalRemaining, totalMonthly });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/budgets — budget alokasi + actual bulan ini
+// ============================================================
+app.get('/api/budgets', (req, res) => {
+  try {
+    const budgetRows = db.prepare('SELECT category, amount FROM budgets').all();
+    const budgets = {};
+    for (const b of budgetRows) budgets[b.category] = b.amount;
+
+    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const actualRows = db.prepare(
+      "SELECT category, SUM(amount) as actual FROM transactions WHERE type='Out' AND date LIKE ? GROUP BY category"
+    ).all(`${month}%`);
+    const actual = {};
+    for (const r of actualRows) actual[r.category] = r.actual;
+
+    const result = Object.entries(budgets).map(([cat, budget]) => ({
+      category: cat, budget, actual: actual[cat] || 0,
+      remaining: budget - (actual[cat] || 0),
+      overBudget: (actual[cat] || 0) > budget
+    }));
+    res.json({ budgets: result, month });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/income?month=YYYY-MM — income transactions
+// ============================================================
+app.get('/api/income', (req, res) => {
+  try {
+    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const rows = db.prepare(
+      "SELECT id, date, category, account, amount, desc FROM transactions WHERE type='In' AND date LIKE ? ORDER BY date DESC"
+    ).all(`${month}%`);
+    const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+    res.json({ month, income: rows, totalIncome: total });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/expenses?month=YYYY-MM — expense transactions
+// ============================================================
+app.get('/api/expenses', (req, res) => {
+  try {
+    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const rows = db.prepare(
+      "SELECT id, date, category, account, amount, desc FROM transactions WHERE type='Out' AND date LIKE ? ORDER BY date DESC"
+    ).all(`${month}%`);
+    const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+    const byCategory = {};
+    for (const r of rows) byCategory[r.category] = (byCategory[r.category] || 0) + r.amount;
+    res.json({ month, expenses: rows, totalExpenses: total, byCategory });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/summary — net worth + key metrics
+// ============================================================
+app.get('/api/summary', (req, res) => {
+  try {
+    const configRows = db.prepare('SELECT key, value FROM config').all();
+    const config = {};
+    for (const r of configRows) config[r.key] = r.value;
+    const netIncome = parseFloat(config.salary) || 0;
+
+    const banks       = db.prepare('SELECT SUM(balance) as total FROM banks').get();
+    const cc          = db.prepare('SELECT SUM(outstanding) as out, SUM(limit_amt) as lim FROM credit_cards').get();
+    const loans       = db.prepare('SELECT SUM(remaining) as rem, SUM(monthly) as mon FROM loans').get();
+    const investments = db.prepare('SELECT SUM(cost_basis) as cost FROM investments').get();
+
+    const totalCash        = banks.total || 0;
+    const totalInvestments = investments.cost || 0;
+    const totalAssets      = totalCash + totalInvestments;
+    const totalLiabilities = (cc.out || 0) + (loans.rem || 0);
+    const netWorth         = totalAssets - totalLiabilities;
+    const totalMonthly     = loans.mon || 0;
+    const dti              = netIncome ? Math.round(totalMonthly / netIncome * 100) : 0;
+    const ccUtil           = cc.lim ? Math.round((cc.out || 0) / cc.lim * 100) : 0;
+
+    const month = new Date().toISOString().slice(0, 7);
+    const expRow = db.prepare("SELECT SUM(amount) as total FROM transactions WHERE type='Out' AND date LIKE ?").get(`${month}%`);
+    const incRow = db.prepare("SELECT SUM(amount) as total FROM transactions WHERE type='In' AND date LIKE ?").get(`${month}%`);
+    const cashFlow = (incRow.total || 0) - (expRow.total || 0);
+
+    res.json({
+      netWorth, totalAssets, totalLiabilities,
+      totalCash, totalInvestments,
+      totalCC: cc.out || 0, totalLoans: loans.rem || 0,
+      dti, ccUtilization: ccUtil,
+      cashFlow, netIncome,
+      alerts: [
+        ...(dti > 30    ? [`⚠️ DTI ${dti}% > 30% threshold`] : []),
+        ...(ccUtil > 70 ? [`⚠️ CC utilization ${ccUtil}% > 70%`] : []),
+        ...(cashFlow < 0 ? [`⚠️ Cash flow negatif bulan ini`] : [])
+      ]
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
 // POST /api/transactions — tambah transaksi baru
 // Body: { date, type, category, account, amount, desc }
 // ============================================================
