@@ -44,9 +44,9 @@ GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 FINANCE_URL  = "http://localhost:3000"
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Model routing — Groq-native models, optimized for their infra
-MODEL_FAST    = "groq/compound-mini"  # Groq-native, fast, great instruction following
-MODEL_SMART   = "groq/compound"       # Groq-native, smart, write ops + complex analysis
+# Model routing
+MODEL_FAST    = "meta-llama/llama-4-scout-17b-16e-instruct"  # fast + smart, replaces 8B
+MODEL_SMART   = "llama-3.3-70b-versatile"                    # complex analysis + write ops
 
 # ============================================================
 # ROUTING: model + tool group per intent
