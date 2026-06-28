@@ -652,6 +652,22 @@ def _rw(*names):
     """Read tools + write core — model bisa baca DAN tulis."""
     return _tools(*names, *_WRITE_CORE)
 
+def _num(v, default=0):
+    """Coerce string → float. Llama kadang kirim amount sebagai string."""
+    if v is None: return default
+    try: return float(str(v).replace(",", "").replace(".", "").strip()) if isinstance(v, str) and any(c.isdigit() for c in str(v)) else float(v)
+    except: return default
+
+def _date(v):
+    """Sanitize date arg — kalau model kirim 'current date' / None → today."""
+    from datetime import date as _date_cls
+    today = _date_cls.today().isoformat()
+    if not v or not isinstance(v, str): return today
+    # Reject non-ISO strings like "current date", "today", etc
+    import re
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', v.strip()): return v.strip()
+    return today
+
 TOOL_GROUPS = {
     # READ-ONLY groups (market & non-write queries — ga perlu write tools)
     "market_fx":      _tools("get_fx_rates"),
@@ -1366,17 +1382,17 @@ def execute_tool(name: str, args: dict) -> str:
         )
     elif name == "add_transaction":
         result = exec_add_transaction(
-            date_str=args.get("date", date.today().isoformat()),
+            date_str=_date(args.get("date")),
             trx_type=args.get("type", "Out"),
             category=args.get("category", ""),
             account=args.get("account", ""),
-            amount=args.get("amount", 0),
+            amount=_num(args.get("amount"), 0),
             desc=args.get("desc", "")
         )
     elif name == "update_bank_balance":
         result = exec_update_bank_balance(
             nick=args.get("nick", ""),
-            balance=args.get("balance", 0)
+            balance=_num(args.get("balance"), 0)
         )
     elif name == "get_market_data":
         result = exec_get_market_data(
@@ -1398,8 +1414,10 @@ def execute_tool(name: str, args: dict) -> str:
     elif name == "manage_creditcard":
         result = exec_manage_creditcard(
             action=args.get("action"), name=args.get("name"),
-            issuer=args.get("issuer"), limit=args.get("limit"),
-            outstanding=args.get("outstanding"), due_date=args.get("dueDate"),
+            issuer=args.get("issuer"),
+            limit=_num(args.get("limit")) if args.get("limit") is not None else None,
+            outstanding=_num(args.get("outstanding")) if args.get("outstanding") is not None else None,
+            due_date=args.get("dueDate"),
             notes=args.get("notes")
         )
     elif name == "manage_investment":
@@ -1421,14 +1439,16 @@ def execute_tool(name: str, args: dict) -> str:
     elif name == "manage_budget":
         result = exec_manage_budget(
             action=args.get("action"), category=args.get("category"),
-            amount=args.get("amount")
+            amount=_num(args.get("amount")) if args.get("amount") is not None else None
         )
     elif name == "manage_transaction":
         result = exec_manage_transaction(
             action=args.get("action"), trx_id=args.get("id"),
-            date_str=args.get("date"), type_=args.get("type"),
+            date_str=_date(args.get("date")) if args.get("date") else None,
+            type_=args.get("type"),
             category=args.get("category"), account=args.get("account"),
-            amount=args.get("amount"), desc=args.get("desc")
+            amount=_num(args.get("amount")) if args.get("amount") is not None else None,
+            desc=args.get("desc")
         )
     else:
         result = json.dumps({"error": f"Tool '{name}' tidak dikenal. Ini bug — laporkan ke developer."})
