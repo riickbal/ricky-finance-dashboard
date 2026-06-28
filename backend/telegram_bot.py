@@ -825,7 +825,12 @@ TOOL_GROUPS = {
 def exec_get_banks() -> str:
     try:
         resp = requests.get(f"{FINANCE_URL}/api/banks", timeout=10)
-        return json.dumps(resp.json(), ensure_ascii=False)
+        data = resp.json()
+        # Override 'name' field dengan 'nick' biar model pakai nick sebagai label utama
+        if "banks" in data:
+            for b in data["banks"]:
+                b["name"] = b.get("nick", b.get("name"))  # nick takes priority
+        return json.dumps(data, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
