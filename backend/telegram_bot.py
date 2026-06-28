@@ -52,37 +52,112 @@ MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
 # ROUTING: model + tool group per intent
 # ============================================================
 INTENT_RULES = [
-    # (keywords, model, tool_group_key)
-    # --- Finance READ ---
-    (["saldo", "rekening", "cash", "duit di bank",
-      "terdiri", "rincian", "per bank", "masing", "breakdown bank"],  MODEL_FAST,  "bank"),
-    (["cc", "kartu kredit", "credit card", "tagihan"],                 MODEL_FAST,  "cc"),
-    (["cicilan", "kpr", "kta", "hutang", "pinjaman", "angsuran"],     MODEL_FAST,  "loan"),
-    (["budget", "over budget", "alokasi"],                             MODEL_FAST,  "budget"),
-    (["pengeluaran", "expense", "belanja", "habis berapa", "keluar"],  MODEL_FAST,  "expense"),
-    (["income", "pemasukan", "gaji", "salary", "masuk"],               MODEL_FAST,  "income"),
-    (["net worth", "summary", "overview", "kondisi keuangan",
-      "financial health", "total aset", "total hutang"],               MODEL_FAST,  "summary"),
-    (["catat", "tambah transaksi", "input transaksi", "record"],       MODEL_FAST,  "trx_write"),
-    (["transaksi", "histori", "mutasi", "list transaksi"],             MODEL_FAST,  "trx_read"),
-    # --- Market ---
-    (["kurs", "fx", "dollar", "usd", "eur", "nilai tukar"],            MODEL_FAST,  "market_fx"),
-    (["saham", "stock", "ihsg", "idx", "spx", "etf"],                  MODEL_SMART, "market_stock"),
-    (["crypto", "bitcoin", "btc", "eth", "sol", "coin", "kripto"],     MODEL_SMART, "market_crypto"),
-    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal"],           MODEL_SMART, "market_ta"),
-    (["news", "berita", "market update", "headline"],                   MODEL_SMART, "market_news"),
-    (["portfolio", "investasi", "reksadana", "emas", "p&l", "profit"], MODEL_SMART, "investment"),
-    # --- CRUD ---
-    (["tambah bank", "hapus bank", "edit bank", "update bank"],        MODEL_FAST,  "crud_bank"),
-    (["brief", "pagi", "morning", "daily"],                            MODEL_SMART, "all"),
+    # -------------------------------------------------------
+    # FINANCE READ (urutan: specific dulu baru general)
+    # -------------------------------------------------------
+    (["saldo", "rekening", "duit di bank",
+      "terdiri", "rincian", "per bank", "masing", "breakdown bank",
+      "update saldo"],                                                  MODEL_FAST,  "bank"),
+    (["cc", "kartu kredit", "credit card", "tagihan cc",
+      "due date", "limit cc", "outstanding cc", "utilization"],        MODEL_FAST,  "cc"),
+    (["cicilan", "kpr", "kta", "pinjaman", "angsuran",
+      "lunas", "tenor", "sisa hutang", "outstanding loan"],            MODEL_FAST,  "loan"),
+    (["budget", "over budget", "alokasi", "sisa budget",
+      "limit belanja"],                                                 MODEL_FAST,  "budget"),
+    (["pengeluaran", "expense", "belanja", "habis berapa",
+      "keluar", "spending", "kategori pengeluaran"],                   MODEL_FAST,  "expense"),
+    (["income", "pemasukan", "gaji", "salary",
+      "penghasilan", "terima"],                                        MODEL_FAST,  "income"),
+    (["dti", "debt to income", "cash flow", "cashflow",
+      "savings rate", "tabungan bulanan"],                             MODEL_FAST,  "summary"),
+    (["catat", "tambah transaksi", "input", "record transaksi",
+      "masukin transaksi"],                                            MODEL_FAST,  "trx_write"),
+    (["transaksi", "histori", "mutasi", "list transaksi",
+      "riwayat"],                                                      MODEL_FAST,  "trx_read"),
+    # -------------------------------------------------------
+    # PIUTANG & ASET TETAP
+    # -------------------------------------------------------
+    (["piutang", "receivable", "pinjamin", "tagih",
+      "utang ke gua", "belum dibayar orang", "nyatain"],              MODEL_FAST,  "receivables"),
+    (["aset tetap", "properti", "kendaraan", "rumah", "mobil",
+      "fixed asset", "depresiasi", "book value", "inventaris"],       MODEL_FAST,  "fixed_assets"),
+    # -------------------------------------------------------
+    # MARKET
+    # -------------------------------------------------------
+    (["kurs", "fx", "dollar", "usd", "eur", "sgd", "jpy",
+      "nilai tukar", "exchange rate"],                                 MODEL_FAST,  "market_fx"),
+    (["saham", "stock", "ihsg", "idx", "spx", "etf",
+      "bbca", "tlkm", "bbri", "bmri", "aapl", "msft"],               MODEL_SMART, "market_stock"),
+    (["crypto", "bitcoin", "btc", "eth", "sol", "bnb",
+      "xrp", "coin", "kripto", "altcoin"],                            MODEL_SMART, "market_crypto"),
+    (["analisis", "ta ", "rsi", "ema", "stoch", "teknikal",
+      "support", "resistance", "bullish", "bearish", "trend"],        MODEL_SMART, "market_ta"),
+    (["news", "berita", "market update", "headline", "sentimen"],     MODEL_SMART, "market_news"),
+    # -------------------------------------------------------
+    # INVESTASI
+    # -------------------------------------------------------
+    (["p&l", "profit loss", "untung rugi", "unrealized",
+      "return invest", "gain", "loss", "portfolio pl", "roi"],        MODEL_SMART, "invest_pl"),
+    (["reksadana", "emas", "mutual fund", "gold"],                    MODEL_SMART, "invest_market"),
+    (["portfolio", "investasi", "invest gua", "kondisi invest",
+      "posisi invest", "aset invest"],                                 MODEL_SMART, "invest_market"),
+    # -------------------------------------------------------
+    # PERBANDINGAN / TREN
+    # -------------------------------------------------------
+    (["banding", "compare", "bulan lalu", "month over month",
+      "mom", "naik turun", "tren pengeluaran", "vs bulan"],           MODEL_SMART, "expenses_mom"),
+    # -------------------------------------------------------
+    # MULTI-DOMAIN / COMBINED
+    # -------------------------------------------------------
+    (["net worth", "networth", "total kekayaan",
+      "kekayaan bersih", "nilai bersih"],                             MODEL_FAST,  "networth"),
+    (["total aset", "punya apa aja", "semua aset",
+      "kekayaan total"],                                              MODEL_FAST,  "assets"),
+    (["kondisi keuangan", "financial health", "gimana keuangan",
+      "review keuangan", "cek keuangan", "keseluruhan",
+      "financial overview"],                                          MODEL_SMART, "full_finance"),
+    (["layak beli", "aman ga", "worth it", "bisa beli",
+      "mampu ga", "sanggup"],                                         MODEL_SMART, "advice"),
+    (["saran", "advice", "harus gimana", "strategi",
+      "rekomendasi", "sebaiknya", "optimal", "plan keuangan",
+      "financial plan", "next step"],                                 MODEL_SMART, "advice"),
+    # -------------------------------------------------------
+    # CRUD ENTITIES
+    # -------------------------------------------------------
+    (["tambah bank", "hapus bank", "edit bank",
+      "update bank", "buat rekening"],                                MODEL_FAST,  "crud_bank"),
+    (["tambah cc", "hapus cc", "edit cc", "tambah kartu"],            MODEL_FAST,  "crud_cc"),
+    (["tambah investasi", "hapus investasi", "edit investasi",
+      "update investasi"],                                            MODEL_FAST,  "crud_investment"),
+    (["tambah pinjaman", "hapus pinjaman", "edit loan",
+      "update kpr", "update kta"],                                    MODEL_FAST,  "crud_loan"),
+    (["set budget", "ubah budget", "hapus budget",
+      "update budget", "atur budget"],                                MODEL_FAST,  "crud_budget"),
+    # -------------------------------------------------------
+    # DAILY BRIEF
+    # -------------------------------------------------------
+    (["brief", "pagi", "morning", "daily", "rangkuman harian"],       MODEL_SMART, "all"),
 ]
+
+# Confirmation keywords
+CONFIRM_WORDS = {"ya", "iya", "yes", "ok", "oke", "benar", "betul", "lanjut", "confirm", "setuju", "jalan"}
+CANCEL_WORDS  = {"tidak", "ga", "gak", "nggak", "batal", "cancel", "no", "stop", "jangan"}
 
 # Tool group mapping
 TOOL_GROUPS: dict = {}  # filled after TOOLS is defined
 
-def route(text: str):
+def route(text: str, history: list = None):
     """Return (model, list_of_tools) for a given user message."""
-    lower = text.lower()
+    lower = text.lower().strip().rstrip("!?.").strip()
+
+    # Detect confirmation/cancellation of pending write action
+    if lower in CONFIRM_WORDS or lower in CANCEL_WORDS:
+        # Check if last assistant message was asking for confirmation
+        if history:
+            last_asst = next((m["content"] for m in reversed(history) if m["role"] == "assistant"), "")
+            if any(w in last_asst.lower() for w in ["bener?", "konfirmasi", "confirm", "lanjut?", "pastiin"]):
+                return MODEL_FAST, TOOL_GROUPS.get("all_write", TOOLS)
+
     for keywords, model, group in INTENT_RULES:
         if any(k in lower for k in keywords):
             tools = TOOL_GROUPS.get(group, TOOLS)
@@ -141,6 +216,24 @@ SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI 
 - DTI = Monthly Installments ÷ Net Monthly Income (alert >30%)
 - CC Utilization = Outstanding ÷ Limit (alert >70%)
 - Cash Flow = Income − (Cash Expenses + CC Usage)
+
+## Confirmation Rules (WAJIB untuk semua write operations)
+Sebelum eksekusi add_transaction, manage_bank, manage_creditcard, manage_investment, manage_loan, manage_budget, update_bank_balance — SELALU tampilkan konfirmasi dulu:
+
+Untuk transaksi:
+"Mau catat nih:
+📋 Tipe: [In/Out/Transfer]
+💰 Amount: Rp X,XXX,XXX
+📂 Kategori: [kategori]
+🏦 Account: [rekening]
+📝 Desc: [deskripsi]
+📅 Tanggal: [tanggal]
+
+Bener? (ya/tidak)"
+
+Untuk CRUD entitas lain, tampilkan ringkasan data yang akan diubah/ditambah/dihapus dan tanya konfirmasi.
+Baru eksekusi setelah user balas "ya", "iya", "ok", "lanjut", atau sejenisnya.
+Jika user balas "tidak", "batal", "ga" → cancel, jangan eksekusi tool.
 
 ## Language
 Match user's language naturally (Indonesian/English/mixed Jaksel style is fine)"""
@@ -470,6 +563,46 @@ TOOLS = [
                 "required": ["action", "id"]
             }
         }
+    },
+    # --- Missing data types ---
+    {
+        "type": "function",
+        "function": {
+            "name": "get_receivables",
+            "description": "Ambil data piutang (uang yang dipinjamkan ke orang lain). Panggil untuk pertanyaan tentang piutang, hutang orang ke gua, tagihan ke orang.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_fixed_assets",
+            "description": "Ambil data aset tetap: properti, kendaraan, elektronik, dll. Termasuk book value setelah depresiasi.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_expenses_compare",
+            "description": "Bandingkan pengeluaran 2 bulan (month-over-month). Berguna untuk lihat tren pengeluaran naik/turun.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "month1": {"type": "string", "description": "Bulan pertama YYYY-MM (default: bulan lalu)"},
+                    "month2": {"type": "string", "description": "Bulan kedua YYYY-MM (default: bulan ini)"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_investment_pl",
+            "description": "Ambil portfolio investasi + P&L (profit/loss) berdasarkan harga current vs avg buy. Gunakan ini untuk pertanyaan untung/rugi investasi.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
     }
 ]
 
@@ -493,8 +626,24 @@ TOOL_GROUPS = {
     "market_news":  _tools("get_news"),
     "investment":   _tools("get_investments", "get_market_data"),
     "crud_bank":    _tools("manage_bank"),
-    "bank_summary": _tools("get_banks", "get_summary"),  # default fallback
-    "all":          TOOLS,
+    "bank_summary":   _tools("get_banks", "get_summary"),
+    "receivables":    _tools("get_receivables"),
+    "fixed_assets":   _tools("get_fixed_assets"),
+    "expenses_mom":   _tools("get_expenses_compare"),
+    "invest_pl":      _tools("get_investment_pl", "get_investments"),
+    # --- Combined multi-domain ---
+    "assets":         _tools("get_banks", "get_investments", "get_fixed_assets", "get_receivables", "get_summary"),
+    "networth":       _tools("get_summary", "get_banks", "get_investments", "get_loans", "get_credit_cards", "get_fixed_assets", "get_receivables"),
+    "full_finance":   _tools("get_banks", "get_investments", "get_loans", "get_credit_cards", "get_budgets", "get_summary", "get_fixed_assets", "get_receivables"),
+    "invest_market":  _tools("get_investment_pl", "get_investments", "get_market_data", "get_crypto_prices"),
+    "advice":         _tools("get_summary", "get_investment_pl", "get_market_data", "get_crypto_prices", "get_banks", "get_loans", "get_budgets"),
+    "crud_bank":       _tools("manage_bank", "get_banks"),
+    "crud_cc":         _tools("manage_creditcard", "get_credit_cards"),
+    "crud_investment": _tools("manage_investment", "get_investments"),
+    "crud_loan":       _tools("manage_loan", "get_loans"),
+    "crud_budget":     _tools("manage_budget", "get_budgets"),
+    "all_write":       _tools("add_transaction", "manage_bank", "manage_creditcard", "manage_investment", "manage_loan", "manage_budget", "manage_transaction", "update_bank_balance"),
+    "all":             TOOLS,
 }
 
 # ============================================================
@@ -556,6 +705,114 @@ def exec_get_summary() -> str:
     try:
         resp = requests.get(f"{FINANCE_URL}/api/summary", timeout=10)
         return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_receivables() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/receivables", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_fixed_assets() -> str:
+    try:
+        resp = requests.get(f"{FINANCE_URL}/api/fixed-assets", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_expenses_compare(month1="", month2="") -> str:
+    try:
+        params = {}
+        if month1: params["month1"] = month1
+        if month2: params["month2"] = month2
+        resp = requests.get(f"{FINANCE_URL}/api/expenses/compare", params=params, timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_get_investment_pl() -> str:
+    """Fetch live prices from yfinance → update DB → return enriched P&L."""
+    try:
+        import yfinance as yf
+
+        # Get portfolio from DB
+        resp = requests.get(f"{FINANCE_URL}/api/investments/pl", timeout=10)
+        data = resp.json()
+        portfolio = data.get("portfolio", [])
+
+        # Get USD→IDR rate
+        try:
+            fx = requests.get("https://api.frankfurter.app/latest?from=USD&to=IDR", timeout=5).json()
+            usd_to_idr = fx.get("rates", {}).get("IDR", 16000)
+        except Exception:
+            usd_to_idr = 16000
+
+        total_cost = total_value = 0
+        updated = []
+
+        for inv in portfolio:
+            ticker     = inv.get("ticker", "")
+            currency   = inv.get("currency", "IDR")
+            cost_basis = inv.get("costBasis", 0) or 0
+            qty        = inv.get("qty") or 1
+            db_price   = inv.get("currentPrice") or 0
+            fresh_price = None
+
+            # Auto-fetch from yfinance if ticker present
+            if ticker:
+                try:
+                    hist = yf.Ticker(ticker).history(period="1d")
+                    if not hist.empty:
+                        raw = float(hist["Close"].iloc[-1])
+                        # Convert USD assets → IDR
+                        fresh_price = round(raw * usd_to_idr) if currency in ("USD", "USDT") else round(raw)
+                        # Update DB
+                        requests.patch(
+                            f"{FINANCE_URL}/api/investments/{ticker}",
+                            json={"currentPrice": fresh_price},
+                            timeout=5
+                        )
+                except Exception as e:
+                    logger.warning(f"yfinance {ticker}: {e}")
+
+            price_used    = fresh_price if fresh_price else db_price
+            current_value = price_used * qty if qty else cost_basis
+            pl            = current_value - cost_basis
+            pl_pct        = round(pl / cost_basis * 100, 1) if cost_basis else 0
+
+            total_cost  += cost_basis
+            total_value += current_value
+
+            updated.append({
+                "platform":     inv.get("platform"),
+                "ticker":       ticker,
+                "type":         inv.get("type"),
+                "qty":          qty,
+                "avgBuy":       inv.get("avgBuy"),
+                "currentPrice": price_used,
+                "priceSource":  "live ✅" if fresh_price else "manual ⚠️",
+                "currency":     currency,
+                "costBasis":    cost_basis,
+                "currentValue": round(current_value),
+                "pl":           round(pl),
+                "plPct":        pl_pct
+            })
+
+        total_pl = total_value - total_cost
+        return json.dumps({
+            "portfolio":         updated,
+            "totalCostBasis":    round(total_cost),
+            "totalCurrentValue": round(total_value),
+            "totalPL":           round(total_pl),
+            "totalPLPct":        round(total_pl / total_cost * 100, 1) if total_cost else 0,
+            "usdToIdr":          usd_to_idr,
+            "fetchedAt":         dt.datetime.now(pytz.timezone("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M WIB")
+        }, ensure_ascii=False)
+
+    except ImportError:
+        return json.dumps({"error": "yfinance not installed. Run: pip3 install yfinance"})
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -985,6 +1242,14 @@ def execute_tool(name: str, args: dict) -> str:
         return exec_get_income(month=args.get("month", ""))
     elif name == "get_summary":
         return exec_get_summary()
+    elif name == "get_receivables":
+        return exec_get_receivables()
+    elif name == "get_fixed_assets":
+        return exec_get_fixed_assets()
+    elif name == "get_expenses_compare":
+        return exec_get_expenses_compare(month1=args.get("month1",""), month2=args.get("month2",""))
+    elif name == "get_investment_pl":
+        return exec_get_investment_pl()
     elif name == "get_transactions":
         return exec_get_transactions(
             month=args.get("month", ""),
@@ -1433,7 +1698,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         typing_task = asyncio.create_task(keep_typing())
         try:
-            model, tools = route(text)
+            model, tools = route(text, get_history(uid))
             logger.info(f"🧠 Model: {model} | Tools: {[t['function']['name'] for t in tools]}")
             response = await asyncio.get_event_loop().run_in_executor(
                 None, chat_with_groq, messages, model, tools

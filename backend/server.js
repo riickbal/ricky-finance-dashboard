@@ -601,6 +601,108 @@ app.delete('/api/transactions/:id', (req, res) => {
 });
 
 // ============================================================
+// GET /api/receivables — piutang
+// ============================================================
+app.get('/api/receivables', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM receivables ORDER BY due_date ASC').all();
+    const active   = rows.filter(r => r.status !== 'settled');
+    const settled  = rows.filter(r => r.status === 'settled');
+    const totalActive = active.reduce((s, r) => s + (r.amount || 0), 0);
+    res.json({ receivables: rows, active, settled, totalActive });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/fixed-assets — aset tetap (properti, kendaraan, dll)
+// ============================================================
+app.get('/api/fixed-assets', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM fixed_assets').all();
+    const now = new Date();
+    const assets = rows.map(fa => {
+      const purchaseDate = new Date(fa.purchase_date);
+      const monthsOwned  = Math.floor((now - purchaseDate) / (1000 * 60 * 60 * 24 * 30));
+      const accumulated  = fa.useful_life_months > 0
+        ? Math.min(fa.cost, (fa.cost / fa.useful_life_months) * monthsOwned) : 0;
+      const bookValue = fa.cost - accumulated;
+      return { ...fa, monthsOwned, bookValue: Math.round(bookValue) };
+    });
+    const totalBookValue = assets.reduce((s, a) => s + a.bookValue, 0);
+    res.json({ fixedAssets: assets, totalBookValue });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/expenses/compare?month1=YYYY-MM&month2=YYYY-MM
+// ============================================================
+app.get('/api/expenses/compare', (req, res) => {
+  try {
+    const now = new Date();
+    const thisMonth = now.toISOString().slice(0, 7);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1).toISOString().slice(0, 7);
+    const month1 = req.query.month1 || lastMonth;
+    const month2 = req.query.month2 || thisMonth;
+
+    const getByCategory = (month) => {
+      const rows = db.prepare(
+        "SELECT category, SUM(amount) as total FROM transactions WHERE type='Out' AND date LIKE ? GROUP BY category"
+      ).all(`${month}%`);
+      const map = {};
+      for (const r of rows) map[r.category] = r.total;
+      return map;
+    };
+
+    const d1 = getByCategory(month1);
+    const d2 = getByCategory(month2);
+    const allCats = [...new Set([...Object.keys(d1), ...Object.keys(d2)])];
+
+    const comparison = allCats.map(cat => ({
+      category: cat,
+      [month1]: d1[cat] || 0,
+      [month2]: d2[cat] || 0,
+      diff: (d2[cat] || 0) - (d1[cat] || 0),
+      diffPct: d1[cat] ? Math.round(((d2[cat] || 0) - d1[cat]) / d1[cat] * 100) : null
+    }));
+    const total1 = Object.values(d1).reduce((s, v) => s + v, 0);
+    const total2 = Object.values(d2).reduce((s, v) => s + v, 0);
+    res.json({ month1, month2, comparison, total1, total2, totalDiff: total2 - total1 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// GET /api/investments/pl — portfolio + P&L calculation
+// ============================================================
+app.get('/api/investments/pl', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM investments').all();
+    let totalCost = 0, totalValue = 0;
+    const portfolio = rows.map(inv => {
+      const costBasis    = inv.cost_basis || 0;
+      const currentValue = inv.current_price ? inv.current_price * (inv.qty || 1) : costBasis;
+      const pl           = currentValue - costBasis;
+      const plPct        = costBasis > 0 ? Math.round(pl / costBasis * 100 * 10) / 10 : 0;
+      totalCost  += costBasis;
+      totalValue += currentValue;
+      return {
+        platform: inv.platform, ticker: inv.ticker, type: inv.type,
+        qty: inv.qty, avgBuy: inv.avg_buy, currentPrice: inv.current_price,
+        costBasis, currentValue: Math.round(currentValue),
+        pl: Math.round(pl), plPct,
+        currency: inv.currency, lastUpdate: inv.last_update, notes: inv.notes
+      };
+    });
+    res.json({
+      portfolio,
+      totalCostBasis: Math.round(totalCost),
+      totalCurrentValue: Math.round(totalValue),
+      totalPL: Math.round(totalValue - totalCost),
+      totalPLPct: totalCost > 0 ? Math.round((totalValue - totalCost) / totalCost * 100 * 10) / 10 : 0
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
 // Health check
 // ============================================================
 app.get('/api/health', (req, res) => {
