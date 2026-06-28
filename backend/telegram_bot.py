@@ -45,8 +45,8 @@ FINANCE_URL  = "http://localhost:3000"
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # Model routing
-MODEL_FAST    = "llama-3.1-8b-instant"     # simple queries < 1 detik
-MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
+MODEL_FAST    = "meta-llama/llama-4-scout-17b-16e-instruct"  # fast + smart (MoE, replaces 8B)
+MODEL_SMART   = "llama-3.3-70b-versatile"                    # complex analysis, write ops
 
 # ============================================================
 # ROUTING: model + tool group per intent
@@ -826,10 +826,19 @@ def exec_get_banks() -> str:
     try:
         resp = requests.get(f"{FINANCE_URL}/api/banks", timeout=10)
         data = resp.json()
-        # Override 'name' field dengan 'nick' biar model pakai nick sebagai label utama
+        # Hapus field 'name' seluruhnya — model HARUS pakai 'nick' sebagai label
+        # Jika 'name' ada, model akan reconstruct dari pengetahuannya sendiri (misal "BCA Digital" → salah)
         if "banks" in data:
+            slim = []
             for b in data["banks"]:
-                b["name"] = b.get("nick", b.get("name"))  # nick takes priority
+                slim.append({
+                    "nick":    b.get("nick"),
+                    "acct":    b.get("acct"),
+                    "type":    b.get("type"),
+                    "balance": b.get("balance", 0),
+                    "updated": b.get("updated"),
+                })
+            data["banks"] = slim
         return json.dumps(data, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1617,13 +1626,13 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
     }
     current = messages.copy()
     active_tools = tools if tools else TOOL_GROUPS.get("summary", TOOLS)
-    # 8B tidak reliable untuk write tool calling → upgrade ke 70B kalau ada write tools
+    # Scout tidak reliable untuk write tool calling → upgrade ke 70B kalau ada write tools
     _write_names = set(_WRITE_CORE)
     _active_tool_names = {t["function"]["name"] for t in active_tools}
     if model == MODEL_FAST and _active_tool_names & _write_names:
         model = MODEL_SMART
         logger.info("⬆️ Auto-upgrade ke 70B (write tools present)")
-    # Fallback: if 70B hits rate limit, retry with 8B
+    # Fallback: if 70B hits rate limit, retry with Scout (never downgrade ke 8B)
     models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
     _executed_writes: set = set()  # dedup: cegah model re-execute write op yang sama
@@ -1638,12 +1647,19 @@ def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) 
             "max_tokens":  1024
         }
         resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
-        # 429 rate limit → fallback ke model lebih kecil
-        if resp.status_code == 429 and len(models_to_try) > 1:
-            logger.warning(f"⚠️ 429 rate limit on {models_to_try[0]}, fallback ke {models_to_try[1]}")
-            models_to_try = [models_to_try[1]]
-            payload["model"] = models_to_try[0]
-            resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+        # 429 rate limit → fallback ke Scout (bukan 8B), atau retry dengan backoff
+        if resp.status_code == 429:
+            if len(models_to_try) > 1:
+                logger.warning(f"⚠️ 429 rate limit on {models_to_try[0]}, fallback ke {models_to_try[1]}")
+                models_to_try = [models_to_try[1]]
+                payload["model"] = models_to_try[0]
+                import time; time.sleep(2)
+                resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+            else:
+                # Already on Scout, wait and retry once
+                logger.warning(f"⚠️ 429 on {models_to_try[0]}, retry in 3s...")
+                import time; time.sleep(3)
+                resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
         if not resp.ok:
             logger.error(f"❌ Groq {resp.status_code}: {resp.text[:500]}")
             # 400 tool_use_failed → auto-retry dengan 70B + clean history
