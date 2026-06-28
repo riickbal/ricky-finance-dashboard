@@ -39,10 +39,38 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # CONFIG
 # ============================================================
 BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
-OLLAMA_URL   = "http://localhost:11434/api/chat"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 FINANCE_URL  = "http://localhost:3000"
-MODEL        = "qwen2.5:7b"
 PROJECT_ROOT = Path(__file__).parent.parent
+
+# Model routing
+MODEL_FAST    = "llama-3.1-8b-instant"     # simple queries < 1 detik
+MODEL_SMART   = "llama-3.3-70b-versatile"  # complex analysis ~3-5 detik
+
+SIMPLE_KEYWORDS = [
+    "saldo", "berapa", "balance", "mutasi", "catat", "tambah", "hapus",
+    "update", "kurs", "fx", "transfer", "bayar", "topup", "cicilan"
+]
+COMPLEX_KEYWORDS = [
+    "analisis", "analysis", "ta ", "rsi", "ema", "stoch", "portfolio",
+    "review", "rekomendasi", "recommend", "saham", "crypto", "bitcoin",
+    "ihsg", "spx", "trend", "bullish", "bearish", "support", "resistance",
+    "fear", "greed", "news", "brief", "laporan", "market", "teknikal",
+    "teknis", "prediksi", "forecast", "beli", "jual", "posisi"
+]
+
+def route_model(text: str) -> str:
+    """Classify complexity → return model name."""
+    lower = text.lower()
+    # Complex keywords take priority
+    if any(k in lower for k in COMPLEX_KEYWORDS):
+        return MODEL_SMART
+    # Simple if matches simple keywords
+    if any(k in lower for k in SIMPLE_KEYWORDS):
+        return MODEL_FAST
+    # Default: smart (safer for unknown queries)
+    return MODEL_SMART
 
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
 ALLOWED_USER_IDS = []
@@ -866,30 +894,46 @@ def execute_tool(name: str, args: dict) -> str:
         return json.dumps({"error": f"Unknown tool: {name}"})
 
 # ============================================================
-# OLLAMA AGENTIC LOOP
+# GROQ AGENTIC LOOP (OpenAI-compatible)
 # ============================================================
-def chat_with_ollama(messages: list) -> str:
+def chat_with_groq(messages: list, model: str = MODEL_SMART) -> str:
+    if not GROQ_API_KEY:
+        return "❌ GROQ_API_KEY belum diset. Tambahkan ke backend/.env"
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
     current = messages.copy()
-    for _ in range(6):  # max 6 iterations
+
+    for iteration in range(6):  # max 6 iterations
         payload = {
-            "model": MODEL,
-            "messages": current,
-            "tools": TOOLS,
-            "stream": False,
-            "options": {"num_ctx": 8192, "num_predict": 1024, "temperature": 0.3}
+            "model":       model,
+            "messages":    current,
+            "tools":       TOOLS,
+            "tool_choice": "auto",
+            "temperature": 0.3,
+            "max_tokens":  1024
         }
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=120)
+        resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         data    = resp.json()
-        message = data.get("message", {})
-        content = message.get("content", "")
-        tool_calls = message.get("tool_calls", [])
+        choice  = data["choices"][0]
+        message = choice["message"]
+        content    = message.get("content") or ""
+        tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
             return content or "Maaf, ga ada respons."
 
-        current.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls})
+        # Append assistant message (with tool_calls intact)
+        current.append({
+            "role":       "assistant",
+            "content":    content,
+            "tool_calls": tool_calls
+        })
 
+        # Execute each tool call
         for tc in tool_calls:
             fn   = tc.get("function", {})
             name = fn.get("name", "")
@@ -899,7 +943,12 @@ def chat_with_ollama(messages: list) -> str:
                 except: args = {}
             result = execute_tool(name, args)
             logger.info(f"✅ Tool result: {result[:120]}...")
-            current.append({"role": "tool", "content": result})
+            # OpenAI format requires tool_call_id
+            current.append({
+                "role":         "tool",
+                "tool_call_id": tc.get("id", ""),
+                "content":      result
+            })
 
     return "Maaf, terlalu banyak iterasi tool call."
 
@@ -1128,14 +1177,21 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"✅ Finance API — {d.get('transactions', '?')} transaksi")
     except Exception as e:
         lines.append(f"❌ Finance API — {e}")
-    # Ollama
+    # Groq API
     try:
-        r = requests.get("http://localhost:11434/api/tags", timeout=5)
-        models = [m["name"] for m in r.json().get("models", [])]
-        has_model = any("qwen3" in m.lower() for m in models)
-        lines.append(f"{'✅' if has_model else '⚠️'} Ollama — {MODEL} {'ready' if has_model else 'NOT FOUND'}")
+        r = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            timeout=5
+        )
+        if r.status_code == 200:
+            lines.append(f"✅ Groq API — connected")
+            lines.append(f"   Fast  : {MODEL_FAST}")
+            lines.append(f"   Smart : {MODEL_SMART}")
+        else:
+            lines.append(f"⚠️ Groq API — HTTP {r.status_code}")
     except Exception as e:
-        lines.append(f"❌ Ollama — {e}")
+        lines.append(f"❌ Groq API — {e}")
     # Data sources
     try:
         requests.get("https://api.frankfurter.app/latest", timeout=5)
@@ -1198,8 +1254,10 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         typing_task = asyncio.create_task(keep_typing())
         try:
+            model = route_model(text)
+            logger.info(f"🧠 Model: {model}")
             response = await asyncio.get_event_loop().run_in_executor(
-                None, chat_with_ollama, messages
+                None, chat_with_groq, messages, model
             )
         finally:
             typing_task.cancel()
@@ -1227,9 +1285,10 @@ def main():
         return
 
     logger.info("🚀 Edith Telegram Bot v2 starting...")
-    logger.info(f"   Model  : {MODEL}")
-    logger.info(f"   Finance: {FINANCE_URL}")
-    logger.info(f"   Ollama : {OLLAMA_URL}")
+    logger.info(f"   Fast model : {MODEL_FAST}")
+    logger.info(f"   Smart model: {MODEL_SMART}")
+    logger.info(f"   Finance API: {FINANCE_URL}")
+    logger.info(f"   Groq key   : {'✅ set' if GROQ_API_KEY else '❌ MISSING — set GROQ_API_KEY in .env'}")
 
     app = Application.builder().token(BOT_TOKEN).build()
 
