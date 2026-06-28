@@ -1,5 +1,5 @@
 // data.js — Auto-synced from Finance API
-// Last updated: 2026-06-28 20:53:15
+// Last updated: 2026-06-28 20:53:17
 // DO NOT EDIT MANUALLY — managed by Edith
 
 const FINANCE_DATA = {
@@ -72,7 +72,7 @@ const FINANCE_DATA = {
       "cat": "Bank",
       "type": "Tabungan",
       "acct": "4144397598",
-      "balance": 734000,
+      "balance": 1808885,
       "updated": "2026-06-28",
       "notes": null
     }
