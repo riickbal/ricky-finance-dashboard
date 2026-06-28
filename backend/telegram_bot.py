@@ -39,8 +39,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
 ALLOWED_USER_IDS = []
 
-# Daily brief jam 7 pagi WIB (UTC+7 = UTC 00:00)
-DAILY_BRIEF_HOUR_UTC = 0
+# Daily brief jam 5 pagi WIB (UTC+7 = UTC 22:00 malam sebelumnya)
+DAILY_BRIEF_HOUR_UTC = 22
 
 MAX_HISTORY = 20
 
@@ -61,10 +61,16 @@ SYSTEM_PROMPT = """You are Edith, a personal finance and market intelligence AI 
 
 ## Market Rules
 - Call get_market_data for stock/IHSG/SPX/ETF questions
-- Call get_crypto_prices for crypto questions
+- Call get_crypto_prices for quick price check (current price, 24h change, market cap)
+- For crypto TECHNICAL ANALYSIS (support/resistance, trend, candles): use get_market_data with yfinance tickers: BTC-USD, ETH-USD, SOL-USD, BNB-USD, XRP-USD, ADA-USD
 - Call get_fx_rates for currency/FX questions
 - Call get_news for market news or exposure analysis
-- For technical analysis: mention support/resistance levels when data available
+- Support/resistance: use recent 3mo OHLC data, identify key price levels from highs/lows
+- When presenting technical analysis, always show all 4 indicators in this format:
+  📊 EMA → trend direction (bullish/bearish/mixed), price vs EMA9/21/50
+  📉 RSI → value + overbought/oversold/neutral signal
+  🎯 STOCH → K/D values + overbought/oversold + bullish/bearish cross
+  😨 FEAR & GREED → index value + label (Extreme Fear/Fear/Neutral/Greed/Extreme Greed)
 - Always state data is for information only, not financial advice
 
 ## Key Metrics
@@ -151,7 +157,7 @@ TOOLS = [
                     "tickers": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List ticker. IDX: BBCA.JK, TLKM.JK. Global: AAPL, MSFT. Index: ^JKSE, ^GSPC. ETF: SPY, EIDO."
+                        "description": "List ticker. IDX: BBCA.JK, TLKM.JK. Global: AAPL, MSFT. Index: ^JKSE, ^GSPC. ETF: SPY, EIDO. Crypto: BTC-USD, ETH-USD, SOL-USD, BNB-USD, XRP-USD — gunakan untuk technical analysis crypto."
                     },
                     "period": {
                         "type": "string",
@@ -404,13 +410,42 @@ def exec_update_bank_balance(nick, balance) -> str:
         return json.dumps({"error": str(e)})
 
 
+def _calc_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
+
+def _calc_rsi(series, period=14):
+    delta = series.diff()
+    gain  = delta.clip(lower=0).rolling(period).mean()
+    loss  = (-delta.clip(upper=0)).rolling(period).mean()
+    rs    = gain / loss.replace(0, float('nan'))
+    return 100 - (100 / (1 + rs))
+
+def _calc_stoch(high, low, close, k_period=14, d_period=3):
+    lowest_low   = low.rolling(k_period).min()
+    highest_high = high.rolling(k_period).max()
+    k = 100 * (close - lowest_low) / (highest_high - lowest_low).replace(0, float('nan'))
+    d = k.rolling(d_period).mean()
+    return k, d
+
+def _fear_greed() -> dict:
+    try:
+        r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=8)
+        d = r.json()["data"][0]
+        return {"value": int(d["value"]), "label": d["value_classification"]}
+    except Exception:
+        return {"value": None, "label": "unavailable"}
+
 def exec_get_market_data(tickers: list, period: str = "3mo") -> str:
     try:
         import yfinance as yf
         results = {}
+
+        # Fear & Greed (crypto sentiment) — fetch once
+        fg = _fear_greed()
+
         for ticker in tickers:
             try:
-                t = yf.Ticker(ticker)
+                t    = yf.Ticker(ticker)
                 info = t.info
                 hist = t.history(period=period)
 
@@ -418,32 +453,77 @@ def exec_get_market_data(tickers: list, period: str = "3mo") -> str:
                     results[ticker] = {"error": "no data"}
                     continue
 
-                current = hist["Close"].iloc[-1]
-                prev    = hist["Close"].iloc[-2] if len(hist) > 1 else current
-                change  = ((current - prev) / prev * 100) if prev else 0
+                close  = hist["Close"]
+                high   = hist["High"]
+                low    = hist["Low"]
+                current = round(float(close.iloc[-1]), 2)
+                prev    = float(close.iloc[-2]) if len(close) > 1 else current
+                change  = round((current - prev) / prev * 100, 2) if prev else 0
 
-                # Simple support/resistance (52w)
-                high52 = hist["Close"].max()
-                low52  = hist["Close"].min()
+                # --- EMA ---
+                ema9   = round(float(_calc_ema(close, 9).iloc[-1]), 2)
+                ema21  = round(float(_calc_ema(close, 21).iloc[-1]), 2)
+                ema50  = round(float(_calc_ema(close, 50).iloc[-1]), 2)
+                ema200 = round(float(_calc_ema(close, 200).iloc[-1]), 2) if len(close) >= 200 else None
+                ema_signal = "BULLISH" if current > ema21 > ema50 else ("BEARISH" if current < ema21 < ema50 else "MIXED")
+
+                # --- RSI ---
+                rsi_val  = round(float(_calc_rsi(close, 14).iloc[-1]), 1)
+                if rsi_val >= 70:   rsi_signal = "OVERBOUGHT ⚠️"
+                elif rsi_val <= 30: rsi_signal = "OVERSOLD ⚠️"
+                else:               rsi_signal = "NEUTRAL ✅"
+
+                # --- STOCH ---
+                stoch_k, stoch_d = _calc_stoch(high, low, close)
+                sk = round(float(stoch_k.iloc[-1]), 1)
+                sd = round(float(stoch_d.iloc[-1]), 1)
+                if sk >= 80:   stoch_signal = "OVERBOUGHT ⚠️"
+                elif sk <= 20: stoch_signal = "OVERSOLD ⚠️"
+                else:          stoch_signal = "NEUTRAL ✅"
+                stoch_cross = "BULLISH CROSS" if sk > sd else "BEARISH CROSS"
+
+                # --- Support / Resistance ---
+                period_high = round(float(close.max()), 2)
+                period_low  = round(float(close.min()), 2)
+                support1    = round(period_low * 1.02, 2)
+                resistance1 = round(period_high * 0.98, 2)
 
                 results[ticker] = {
-                    "price":       round(current, 2),
-                    "change_pct":  round(change, 2),
-                    "high_period": round(high52, 2),
-                    "low_period":  round(low52, 2),
-                    "support_est": round(low52 * 1.02, 2),   # ~2% above period low
-                    "resistance_est": round(high52 * 0.98, 2),
-                    "currency":    info.get("currency", ""),
                     "name":        info.get("shortName", ticker),
-                    "sector":      info.get("sector", ""),
-                    "pe_ratio":    info.get("trailingPE"),
-                    "pb_ratio":    info.get("priceToBook"),
-                    "market_cap":  info.get("marketCap"),
-                    "dividend_yield": info.get("dividendYield"),
-                    "52w_high":    info.get("fiftyTwoWeekHigh"),
-                    "52w_low":     info.get("fiftyTwoWeekLow"),
-                    "avg_volume":  info.get("averageVolume"),
-                    "period":      period
+                    "currency":    info.get("currency", "USD"),
+                    "price":       current,
+                    "change_pct":  change,
+                    "period":      period,
+                    # EMA
+                    "ema": {
+                        "ema9": ema9, "ema21": ema21, "ema50": ema50, "ema200": ema200,
+                        "signal": ema_signal,
+                        "note": f"Price {'above' if current > ema21 else 'below'} EMA21"
+                    },
+                    # RSI
+                    "rsi": {
+                        "value": rsi_val, "signal": rsi_signal,
+                        "note": "Overbought >70, Oversold <30"
+                    },
+                    # STOCH
+                    "stoch": {
+                        "k": sk, "d": sd, "signal": stoch_signal,
+                        "cross": stoch_cross,
+                        "note": "Overbought >80, Oversold <20"
+                    },
+                    # Support/Resistance
+                    "support_resistance": {
+                        "support1": support1, "resistance1": resistance1,
+                        "period_low": period_low, "period_high": period_high
+                    },
+                    # Sentiment (Fear & Greed — relevan untuk crypto)
+                    "fear_greed": fg,
+                    # Fundamentals
+                    "market_cap":      info.get("marketCap"),
+                    "52w_high":        info.get("fiftyTwoWeekHigh"),
+                    "52w_low":         info.get("fiftyTwoWeekLow"),
+                    "pe_ratio":        info.get("trailingPE"),
+                    "avg_volume":      info.get("averageVolume"),
                 }
             except Exception as ex:
                 results[ticker] = {"error": str(ex)}
@@ -833,69 +913,161 @@ def clear_history(uid: int):
     histories[uid] = []
 
 # ============================================================
-# DAILY BRIEF
+# DAILY BRIEF HELPERS
+# ============================================================
+def _fetch_news_by_region():
+    """Fetch news, split national (ID) vs international."""
+    try:
+        import feedparser
+        national_feeds = [
+            ("Bisnis.com",    "https://ekonomi.bisnis.com/rss"),
+            ("CNBC Indonesia","https://www.cnbcindonesia.com/rss"),
+            ("Kontan",        "https://rss.kontan.co.id/"),
+        ]
+        intl_feeds = [
+            ("Reuters",   "https://feeds.reuters.com/reuters/businessNews"),
+            ("CNBC World","https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+            ("Bloomberg", "https://feeds.bloomberg.com/markets/news.rss"),
+        ]
+        def scrape(feeds, limit=3):
+            items = []
+            for source, url in feeds:
+                try:
+                    feed = feedparser.parse(url)
+                    for e in feed.entries[:2]:
+                        items.append({
+                            "source":  source,
+                            "title":   e.get("title", "").strip(),
+                            "link":    e.get("link", ""),
+                            "summary": e.get("summary", "")[:150].strip()
+                        })
+                        if len(items) >= limit: break
+                except Exception: continue
+                if len(items) >= limit: break
+            return items[:limit]
+        return scrape(national_feeds, 3), scrape(intl_feeds, 3)
+    except Exception as e:
+        return [], []
+
+def _fmt_ta_mini(d: dict) -> str:
+    """One-line TA summary for daily brief."""
+    if not d or "error" in d: return "N/A"
+    rsi  = d.get("rsi", {})
+    stch = d.get("stoch", {})
+    ema  = d.get("ema", {})
+    fg   = d.get("fear_greed", {})
+    parts = []
+    if rsi.get("value"):  parts.append(f"RSI {rsi['value']}")
+    if stch.get("k"):     parts.append(f"Stoch K{stch['k']}")
+    if ema.get("signal"): parts.append(ema["signal"])
+    if fg.get("value"):   parts.append(f"F&G {fg['value']} {fg.get('label','')}")
+    return " | ".join(parts) if parts else "N/A"
+
+
+# ============================================================
+# DAILY BRIEF — 2 CHAT MESSAGES
 # ============================================================
 async def send_daily_brief(context: ContextTypes.DEFAULT_TYPE):
-    """Auto-send morning brief ke semua subscriber."""
+    """Auto-send morning brief ke semua subscriber — 2 pesan terpisah."""
     if not subscribers:
         return
 
+    today = dt.datetime.now(pytz.timezone("Asia/Jakarta")).strftime("%d %b %Y")
+
     try:
+        # --- Fetch semua data ---
+        markets = json.loads(exec_get_market_data(
+            ["^JKSE", "^GSPC", "BTC-USD", "ETH-USD", "SOL-USD", "SPY", "EIDO"], "5d"
+        ))
         fx      = json.loads(exec_get_fx_rates())
-        markets = json.loads(exec_get_market_data(["^JKSE", "^GSPC"], "5d"))
-        crypto  = json.loads(exec_get_crypto_prices(["bitcoin", "ethereum", "solana"]))
-        today   = dt.datetime.now().strftime("%d %b %Y")
+        news_id, news_intl = _fetch_news_by_region()
+        fin     = json.loads(exec_get_finance_data())
 
-        # FX block
-        rates = fx.get("rates", {})
-        def fmt_fx(c): return f"Rp {rates.get(c, 0):,.0f}" if c in rates else "N/A"
-
-        fx_block = (
-            f"*💱 FX Rates (vs IDR)*\n"
-            f"USD: {fmt_fx('USD')}\n"
-            f"EUR: {fmt_fx('EUR')}\n"
-            f"CHF: {fmt_fx('CHF')}\n"
-            f"JPY: {fmt_fx('JPY')}\n"
-            f"CNY: {fmt_fx('CNY')}\n"
-            f"SGD: {fmt_fx('SGD')}"
-        )
-
-        # Market block
-        def fmt_mkt(ticker, name):
+        # ── CHAT 1: NEWS + MARKET ──────────────────────────────
+        def fmt_asset(ticker, label):
             d = markets.get(ticker, {})
-            if "error" in d: return f"{name}: N/A"
-            chg = d.get("change_pct", 0)
+            if not d or "error" in d: return f"• {label}: N/A"
+            chg   = d.get("change_pct", 0)
+            price = d.get("price", 0)
             emoji = "🟢" if chg >= 0 else "🔴"
-            return f"{name}: {d.get('price', 0):,.2f} {emoji} {chg:+.2f}%"
+            ta    = _fmt_ta_mini(d)
+            cur   = d.get("currency", "")
+            p_fmt = f"${price:,.2f}" if cur == "USD" else f"{price:,.2f}"
+            return f"• {label}: {p_fmt} {emoji}{chg:+.2f}%\n  _{ta}_"
 
-        mkt_block = (
-            f"*📈 Markets*\n"
-            f"{fmt_mkt('^JKSE', 'IHSG')}\n"
-            f"{fmt_mkt('^GSPC', 'S&P 500')}"
+        fx_rates = fx.get("rates", {})
+        def fmt_fx(c): return f"Rp{fx_rates.get(c,0):,.0f}" if c in fx_rates else "N/A"
+
+        # News blocks
+        def fmt_news(items):
+            lines = []
+            for i, n in enumerate(items, 1):
+                link = f" [→]({n['link']})" if n.get("link") else ""
+                lines.append(f"{i}\\. *{n['title'][:80]}*{link}\n   _{n['source']}_")
+            return "\n".join(lines) if lines else "_Tidak ada berita_"
+
+        chat1 = (
+            f"🌅 *Edith Morning Brief — {today}*\n"
+            f"\n🇮🇩 *News Nasional*\n{fmt_news(news_id)}"
+            f"\n\n🌐 *News Internasional*\n{fmt_news(news_intl)}"
+            f"\n\n📈 *Market Update*\n"
+            f"{fmt_asset('^JKSE',  'IHSG')}\n"
+            f"{fmt_asset('^GSPC',  'S&P 500')}\n"
+            f"{fmt_asset('SPY',    'SPY ETF')}\n"
+            f"{fmt_asset('EIDO',   'EIDO ETF')}\n"
+            f"{fmt_asset('BTC-USD','BTC')}\n"
+            f"{fmt_asset('ETH-USD','ETH')}\n"
+            f"{fmt_asset('SOL-USD','SOL')}"
+            f"\n\n💱 *FX*: USD {fmt_fx('USD')} | EUR {fmt_fx('EUR')} | SGD {fmt_fx('SGD')}"
         )
 
-        # Crypto block
-        def fmt_crypto(cid, name):
-            d = crypto.get(cid, {})
-            if not d: return f"{name}: N/A"
-            chg = d.get("change_24h", 0)
-            emoji = "🟢" if chg >= 0 else "🔴"
-            idr = d.get("idr", 0)
-            usd = d.get("usd", 0)
-            return f"{name}: ${usd:,.0f} {emoji} {chg:+.1f}% = Rp {idr/1e6:.2f}jt"
+        # ── CHAT 2: SALDO BANK + BUDGET ALERT ─────────────────
+        banks   = fin.get("banks", [])
+        budgets = fin.get("budgets", {})
+        trx_now = fin.get("transactionsThisMonth", [])
 
-        crypto_block = (
-            f"*₿ Crypto*\n"
-            f"{fmt_crypto('bitcoin', 'BTC')}\n"
-            f"{fmt_crypto('ethereum', 'ETH')}\n"
-            f"{fmt_crypto('solana', 'SOL')}"
+        # Hitung spending per kategori bulan ini
+        spending: dict = {}
+        for t in trx_now:
+            if t.get("type") == "Out":
+                cat = t.get("category", "Other")
+                spending[cat] = spending.get(cat, 0) + t.get("amount", 0)
+
+        # Over-budget alerts
+        alerts = []
+        for cat, budget_amt in budgets.items():
+            if budget_amt > 0:
+                spent = spending.get(cat, 0)
+                pct   = spent / budget_amt * 100
+                if pct >= 80:
+                    status = "🔴 OVER" if pct >= 100 else "⚠️ 80%+"
+                    alerts.append(f"{status} {cat}: Rp{spent:,.0f} / Rp{budget_amt:,.0f} ({pct:.0f}%)")
+
+        bank_lines = "\n".join(
+            f"• {b['nick']}: *Rp{b['balance']:,.0f}*" + (f" _{b.get('notes','')[:40]}_" if b.get("notes") else "")
+            for b in banks
+        )
+        total_bank = sum(b.get("balance", 0) for b in banks)
+
+        alert_block = (
+            "\n\n⚠️ *Budget Alert*\n" + "\n".join(alerts)
+            if alerts else "\n\n✅ *Semua kategori masih dalam budget*"
         )
 
-        msg = f"🌅 *Edith Daily Brief — {today}*\n\n{fx_block}\n\n{mkt_block}\n\n{crypto_block}"
+        chat2 = (
+            f"💰 *Saldo Bank — {today}*\n\n"
+            f"{bank_lines}\n\n"
+            f"*Total Cash: Rp{total_bank:,.0f}*"
+            f"{alert_block}"
+        )
 
+        # --- Kirim 2 pesan ---
         for uid, chat_id in subscribers.items():
             try:
-                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                await context.bot.send_message(chat_id=chat_id, text=chat1,
+                                               parse_mode="MarkdownV2", disable_web_page_preview=True)
+                await context.bot.send_message(chat_id=chat_id, text=chat2,
+                                               parse_mode="Markdown")
             except Exception as e:
                 logger.error(f"Failed to send brief to {uid}: {e}")
 
@@ -976,8 +1148,10 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     subscribers[uid] = chat_id
     await update.message.reply_text(
-        f"✅ Lo udah subscribe daily brief!\n"
-        f"Tiap pagi jam 7 WIB lo dapat update FX, IHSG, SPX & Crypto."
+        f"✅ Subscribe daily brief aktif!\n"
+        f"Tiap pagi jam 05:00 WIB lo dapat 2 pesan:\n"
+        f"1️⃣ Hot news + market update (IHSG, SPX, BTC, ETH, SOL, ETF) + TA indicators\n"
+        f"2️⃣ Snapshot saldo semua bank + budget alert"
     )
 
 
@@ -1060,10 +1234,10 @@ def main():
     wib = pytz.timezone("Asia/Jakarta")
     app.job_queue.run_daily(
         send_daily_brief,
-        time=dt.time(hour=7, minute=0, tzinfo=wib),
+        time=dt.time(hour=5, minute=0, tzinfo=wib),
         name="daily_brief"
     )
-    logger.info("⏰ Daily brief scheduled at 07:00 WIB")
+    logger.info("⏰ Daily brief scheduled at 05:00 WIB")
 
     logger.info("✅ Bot running. Ctrl+C to stop.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
