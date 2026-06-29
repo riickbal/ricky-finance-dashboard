@@ -292,10 +292,11 @@ saldo→get_banks | cc→get_credit_cards | cicilan→get_loans | budget→get_b
 pengeluaran→get_expenses | income→get_income | overview→get_summary | histori→get_transactions
 invest→get_investments | saham→get_market_data | crypto→get_crypto_prices | kurs→get_fx_rates | berita→get_news
 
-TRANSAKSI: Backend auto-update saldo tiap add_transaction — JANGAN manual update_bank_balance.
-Sebelum eksekusi WAJIB konfirmasi tabel dulu:
-| # | Tgl | Deskripsi | Jumlah | Akun | Kategori |
-Setelah Ricky konfirmasi → eksekusi → lapor ✅/❌ per baris.
+TRANSAKSI: Kalau Ricky mau catat transaksi:
+1. WAJIB panggil tool stage_transactions([...]) dulu — kirim semua sekaligus dalam array
+2. Tool akan tampilkan tabel konfirmasi ke Ricky secara otomatis
+3. Ricky konfirmasi → Python langsung execute — lo TIDAK perlu panggil add_transaction
+JANGAN tulis tabel manual. JANGAN panggil add_transaction langsung tanpa stage dulu.
 
 NAMA REKENING — WAJIB pakai field "nick" dari data persis, DILARANG rekonstruksi nama sendiri.
 ❌ SALAH: BCA Digital, BCA (Digital), Blu by BCA, CIMB Niaga, Bank Permata
@@ -414,6 +415,35 @@ TOOLS = [
                     "limit":    {"type": "integer", "description": "Max transaksi (default 20)"}
                 },
                 "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stage_transactions",
+            "description": "WAJIB dipanggil sebelum add_transaction. Tampilkan tabel konfirmasi ke user. Kirim semua transaksi sekaligus dalam satu array. User akan konfirmasi sebelum data disimpan.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "transactions": {
+                        "type": "array",
+                        "description": "Array semua transaksi yang akan dicatat",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "date":     {"type": "string", "description": "YYYY-MM-DD"},
+                                "type":     {"type": "string", "description": "In / Out / Transfer"},
+                                "category": {"type": "string"},
+                                "account":  {"type": "string", "description": "Nick rekening persis dari data"},
+                                "amount":   {"type": "number"},
+                                "desc":     {"type": "string"}
+                            },
+                            "required": ["date", "type", "category", "account", "amount"]
+                        }
+                    }
+                },
+                "required": ["transactions"]
             }
         }
     },
@@ -715,7 +745,7 @@ def _tools(*names):
     return [t for t in TOOLS if t["function"]["name"] in names]
 
 # Write tools yang selalu disertakan agar model ga pernah call tool yang ga ada
-_WRITE_CORE = ("add_transaction", "manage_bank", "manage_creditcard",
+_WRITE_CORE = ("stage_transactions", "add_transaction", "manage_bank", "manage_creditcard",
                "manage_investment", "manage_loan", "manage_budget",
                "manage_transaction", "update_bank_balance",
                "save_memory", "get_memory")
@@ -774,7 +804,7 @@ TOOL_GROUPS = {
     "income":         _rw("get_income"),
     "summary":        _rw("get_summary"),
     "trx_read":       _rw("get_transactions"),
-    "trx_write":      _rw("get_banks", "get_transactions"),
+    "trx_write":      _rw("get_banks", "get_transactions", "stage_transactions"),
     "receivables":    _rw("get_receivables"),
     "fixed_assets":   _rw("get_fixed_assets"),
     "expenses_mom":   _rw("get_expenses_compare"),
@@ -993,6 +1023,26 @@ def exec_get_transactions(month="", category="", limit=50) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+
+def exec_stage_transactions(uid: int, transactions: list) -> str:
+    """Store pending transactions and return a confirmation table for the user."""
+    if not transactions:
+        return json.dumps({"error": "Tidak ada transaksi yang dikirim"})
+    pending_confirmations[uid] = transactions
+    # Build confirmation table
+    lines = ["Nih transaksi yang mau dicatat, cek dulu:\n```"]
+    lines.append(f"{'#':<3} {'Tgl':<12} {'Deskripsi':<22} {'Jumlah':>12} {'Rekening':<14} {'Kategori'}")
+    lines.append("-" * 80)
+    for i, t in enumerate(transactions, 1):
+        tgl   = t.get("date", "")[-5:].replace("-", "/")  # MM/DD → 06/27
+        desc  = t.get("desc", "")[:20]
+        amt   = f"Rp {t.get('amount', 0):>10,.0f}"
+        acc   = t.get("account", "")[:13]
+        cat   = t.get("category", "")
+        lines.append(f"{i:<3} {tgl:<12} {desc:<22} {amt} {acc:<14} {cat}")
+    lines.append("```")
+    lines.append("Bener? Ketik *oke/gas* buat execute atau *batal* buat cancel.")
+    return json.dumps({"staged": len(transactions), "message": "\n".join(lines)})
 
 def exec_add_transaction(date_str, trx_type, category, account, amount, desc="") -> str:
     try:
@@ -1477,7 +1527,7 @@ def _enrich_error(result: str, tool_name: str, args: dict) -> str:
 # ============================================================
 # TOOL DISPATCHER
 # ============================================================
-def execute_tool(name: str, args: dict) -> str:
+def execute_tool(name: str, args: dict, uid: int = 0) -> str:
     logger.info(f"🔧 {name}({args})")
 
     if name == "get_banks":
@@ -1510,6 +1560,8 @@ def execute_tool(name: str, args: dict) -> str:
             category=args.get("category", ""),
             limit=args.get("limit", 50)
         )
+    elif name == "stage_transactions":
+        result = exec_stage_transactions(uid, args.get("transactions", []))
     elif name == "add_transaction":
         result = exec_add_transaction(
             date_str=_date(args.get("date")),
@@ -1602,7 +1654,7 @@ def _call_api(url: str, payload: dict, headers: dict) -> requests.Response:
     """Single API call dengan proper timeout."""
     return requests.post(url, json=payload, headers=headers, timeout=120)
 
-def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = None) -> str:
+def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = None, uid: int = 0) -> str:
     """Dual-engine router: Ollama untuk finance, Groq untuk market/news."""
     import time, re as _re
 
@@ -1726,7 +1778,7 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
                     current.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result})
                     continue
                 _executed_writes.add(dedup_key)
-            result = execute_tool(name, args)
+            result = execute_tool(name, args, uid=uid)
             # Truncate large results to avoid 413 Payload Too Large
             if len(result) > MAX_TOOL_RESULT:
                 result = result[:MAX_TOOL_RESULT] + "\n...[truncated]"
@@ -1745,6 +1797,16 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
 # ============================================================
 histories:   dict = {}
 subscribers: dict = {}  # uid -> chat_id
+
+# Pending confirmation state — stores parsed trx list waiting for user confirm
+# uid -> [{"date","type","category","account","amount","desc"}, ...]
+pending_confirmations: dict = {}
+
+# Words that mean "yes, proceed"
+_CONFIRM_YES = {"oke","ok","gas","lanjut","jalan","bener","setuju","ya","yep","yes",
+                "konfirmasi","execute","eksekusi","proceed","lakukan","jalanin",
+                "fix","deal","betul","bener","correct","yoi","sip","siap"}
+_CONFIRM_NO  = {"batal","cancel","ga jadi","tidak","no","nope","stop","batalin","jangan"}
 
 def get_history(uid: int) -> list:
     return histories.setdefault(uid, [])
@@ -2025,6 +2087,31 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"💬 [{uid}] {user.first_name}: {text}")
 
+    # ── PENDING CONFIRMATION INTERCEPT ──────────────────────────
+    if uid in pending_confirmations:
+        lower_text = text.strip().lower()
+        words = set(lower_text.split())
+        if words & _CONFIRM_NO:
+            pending_confirmations.pop(uid, None)
+            await update.message.reply_text("Oke dibatalin. Ada yang mau diubah?")
+            return
+        if words & _CONFIRM_YES or lower_text in _CONFIRM_YES:
+            trx_list = pending_confirmations.pop(uid, [])
+            results = []
+            for trx in trx_list:
+                res = exec_add_transaction(
+                    trx["date"], trx["type"], trx["category"],
+                    trx["account"], trx["amount"], trx.get("desc", "")
+                )
+                r = json.loads(res)
+                status = "✅" if r.get("success") else "❌"
+                results.append(f"{status} {trx.get('desc','')} Rp{trx['amount']:,.0f} → {trx['account']}")
+            reply = "\n".join(results)
+            add_msg(uid, "assistant", reply)
+            await update.message.reply_text(reply)
+            return
+    # ────────────────────────────────────────────────────────────
+
     add_msg(uid, "user", text)
     messages = [{"role": "system", "content": build_system_prompt()}] + get_history(uid)
 
@@ -2045,7 +2132,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             model, tools = route(text, get_history(uid))
             logger.info(f"🧠 Model: {model} | Tools: {[t['function']['name'] for t in tools]}")
             response = await asyncio.get_event_loop().run_in_executor(
-                None, chat_with_groq, messages, model, tools
+                None, chat_with_groq, messages, model, tools, uid
             )
         finally:
             typing_task.cancel()
