@@ -40,13 +40,24 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ============================================================
 BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 FINANCE_URL  = "http://localhost:3000"
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Model routing
-MODEL_FAST    = "meta-llama/llama-4-scout-17b-16e-instruct"  # fast + smart, replaces 8B
-MODEL_SMART   = "llama-3.3-70b-versatile"                    # complex analysis + write ops
+# ── Dual Engine ──────────────────────────────────────────────
+# 🏠 LOCAL  — Ollama (Qwen2.5:7b) — finance, transaksi, advice
+OLLAMA_URL    = "http://localhost:11434/v1/chat/completions"
+MODEL_FINANCE = "qwen2.5:7b"
+
+# ☁️ CLOUD  — Groq (Llama 3.3 70B) — market, news, TA, FX
+GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
+MODEL_MARKET  = "llama-3.3-70b-versatile"
+
+# Alias untuk backward-compat dengan routing logic
+MODEL_FAST    = MODEL_FINANCE
+MODEL_SMART   = MODEL_MARKET
+
+# Groups yang pakai Groq (data publik — aman di cloud)
+_GROQ_GROUPS  = {"market_fx", "market_stock", "market_crypto", "market_ta", "market_news"}
 
 # ============================================================
 # ROUTING: model + tool group per intent
@@ -212,18 +223,23 @@ def route(text: str, history: list = None):
         if history:
             last_asst = next((m["content"] for m in reversed(history) if m["role"] == "assistant"), "")
             if any(w in last_asst.lower() for w in ["bener?", "konfirmasi", "confirm", "lanjut?", "pastiin"]):
-                return MODEL_FAST, TOOL_GROUPS.get("all_write", TOOLS)
+                return MODEL_FINANCE, TOOL_GROUPS.get("all_write", TOOLS)
 
-    # Compound instruction → write tools + basic read (bukan ALL, terlalu besar)
+    # Compound instruction → Ollama (write tools, data sensitif)
     if _is_compound(raw_lower):
-        return MODEL_SMART, TOOL_GROUPS.get("compound", TOOLS)
+        return MODEL_FINANCE, TOOL_GROUPS.get("compound", TOOLS)
 
     for keywords, model, group in INTENT_RULES:
         if any(k in lower for k in keywords):
+            # Override model: market groups → Groq, finance groups → Ollama
+            if group in _GROQ_GROUPS:
+                model = MODEL_MARKET
+            else:
+                model = MODEL_FINANCE
             tools = TOOL_GROUPS.get(group, TOOLS)
             return model, tools
-    # Default: bank + summary (covers most follow-up questions)
-    return MODEL_FAST, TOOL_GROUPS.get("bank_summary", TOOLS)
+    # Default: Ollama + bank_summary
+    return MODEL_FINANCE, TOOL_GROUPS.get("bank_summary", TOOLS)
 
 # Whitelist: kosong = semua bisa akses. Isi setelah dapat user ID dari /start log.
 ALLOWED_USER_IDS = []
@@ -1569,74 +1585,102 @@ def execute_tool(name: str, args: dict) -> str:
     return _enrich_error(result, name, args)
 
 # ============================================================
-# GROQ AGENTIC LOOP (OpenAI-compatible)
+# DUAL-ENGINE AGENTIC LOOP
+# 🏠 Ollama (local)  — finance, transaksi, advice
+# ☁️ Groq   (cloud)  — market, news, TA, FX
 # ============================================================
-def chat_with_groq(messages: list, model: str = MODEL_FAST, tools: list = None) -> str:
-    if not GROQ_API_KEY:
-        return "❌ GROQ_API_KEY belum diset. Tambahkan ke backend/.env"
+def _call_api(url: str, payload: dict, headers: dict) -> requests.Response:
+    """Single API call dengan proper timeout."""
+    return requests.post(url, json=payload, headers=headers, timeout=120)
 
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    current = messages.copy()
+def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = None) -> str:
+    """Dual-engine router: Ollama untuk finance, Groq untuk market/news."""
+    import time, re as _re
+
+    current      = messages.copy()
     active_tools = tools if tools else TOOL_GROUPS.get("summary", TOOLS)
-    # Scout tidak reliable untuk write tool calling → upgrade ke 70B kalau ada write tools
-    _write_names = set(_WRITE_CORE)
-    _active_tool_names = {t["function"]["name"] for t in active_tools}
-    if model == MODEL_FAST and _active_tool_names & _write_names:
-        model = MODEL_SMART
-        logger.info("⬆️ Auto-upgrade ke 70B (write tools present)")
-    # Fallback: if 70B hits rate limit, retry with Scout (never downgrade ke 8B)
-    models_to_try = [model] if model == MODEL_FAST else [model, MODEL_FAST]
 
-    _executed_writes: set = set()  # dedup: cegah model re-execute write op yang sama
+    # Tentukan engine berdasarkan model
+    use_groq = (model == MODEL_MARKET)
 
-    for iteration in range(6):  # max 6 iterations
+    if use_groq:
+        # ── GROQ (cloud) ─────────────────────────────────────
+        if not GROQ_API_KEY:
+            return "❌ GROQ_API_KEY belum diset di backend/.env"
+        api_url = GROQ_URL
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+        primary_model   = MODEL_MARKET
+        fallback_model  = None   # Groq market — ga ada fallback lokal
+        logger.info(f"☁️ Engine: Groq | Model: {primary_model}")
+    else:
+        # ── OLLAMA (local) ────────────────────────────────────
+        api_url = OLLAMA_URL
+        headers = {"Content-Type": "application/json"}  # Ollama ga butuh API key
+        primary_model  = MODEL_FINANCE
+        fallback_model = MODEL_MARKET  # kalau Ollama down → fallback Groq
+        logger.info(f"🏠 Engine: Ollama | Model: {primary_model}")
+
+    current_model  = primary_model
+    _executed_writes: set = set()
+
+    for iteration in range(6):  # max 6 tool-call iterations
         payload = {
-            "model":       models_to_try[0],
+            "model":       current_model,
             "messages":    current,
             "tools":       active_tools,
             "tool_choice": "auto",
             "temperature": 0.3,
             "max_tokens":  1024
         }
-        resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
-        # 429 rate limit → extract retry-after dari error msg, tunggu, lalu retry
-        if resp.status_code == 429:
-            import time, re as _re
-            err_text = resp.text
-            # Extract "Please try again in X.Xs" dari error message
-            _match = _re.search(r'try again in (\d+(?:\.\d+)?)s', err_text)
-            _wait = float(_match.group(1)) + 1 if _match else 32
-            _wait = min(_wait, 35)  # cap 35 detik
-            if len(models_to_try) > 1:
-                # Coba model fallback dulu tanpa nunggu
-                logger.warning(f"⚠️ 429 on {models_to_try[0]}, coba {models_to_try[1]}...")
-                models_to_try = [models_to_try[1]]
-                payload["model"] = models_to_try[0]
-                resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
-                if resp.status_code == 429:
-                    # Fallback juga 429 → tunggu proper lalu retry
-                    logger.warning(f"⚠️ {models_to_try[0]} juga 429, tunggu {_wait:.0f}s...")
-                    time.sleep(_wait)
-                    resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+        # Handle Ollama connection refused (service belum jalan)
+        try:
+            resp = _call_api(api_url, payload, headers)
+        except requests.exceptions.ConnectionError:
+            if not use_groq and fallback_model and GROQ_API_KEY:
+                logger.warning("⚠️ Ollama tidak bisa diakses → fallback ke Groq")
+                api_url       = GROQ_URL
+                headers       = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+                current_model = fallback_model
+                use_groq      = True
+                resp = _call_api(api_url, payload, headers)
             else:
-                logger.warning(f"⚠️ 429, tunggu {_wait:.0f}s lalu retry...")
-                time.sleep(_wait)
-                resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+                return "❌ Ollama tidak bisa diakses. Pastikan `ollama serve` jalan di Mac Mini."
+
+        # ── Ollama down / connection error → fallback ke Groq ──
+        if not use_groq and resp is not None and resp.status_code in (404, 500, 502, 503):
+            if fallback_model:
+                logger.warning(f"⚠️ Ollama error {resp.status_code} → fallback ke Groq")
+                api_url       = GROQ_URL
+                headers       = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+                current_model = fallback_model
+                use_groq      = True
+                payload.update({"model": current_model})
+                resp = _call_api(api_url, payload, headers)
+
+        # ── 429 rate limit (Groq) → backoff + retry ────────────
+        if resp.status_code == 429:
+            err_text = resp.text
+            _match   = _re.search(r'try again in (\d+(?:\.\d+)?)s', err_text)
+            _wait    = min(float(_match.group(1)) + 1 if _match else 32, 35)
+            logger.warning(f"⚠️ 429 rate limit, tunggu {_wait:.0f}s...")
+            time.sleep(_wait)
+            resp = _call_api(api_url, payload, headers)
+
+        # ── Error handling ──────────────────────────────────────
         if not resp.ok:
-            logger.error(f"❌ Groq {resp.status_code}: {resp.text[:500]}")
-            # 400 tool_use_failed → auto-retry dengan 70B + clean history
+            logger.error(f"❌ API {resp.status_code}: {resp.text[:300]}")
             if resp.status_code == 400 and "tool_use_failed" in resp.text:
-                if models_to_try[0] != MODEL_SMART:
-                    logger.warning("🔄 400 tool_use_failed → retry dengan 70B")
-                    models_to_try = [MODEL_SMART]
+                if not use_groq and fallback_model:
+                    logger.warning("🔄 tool_use_failed → fallback ke Groq")
+                    api_url, headers, current_model, use_groq = (
+                        GROQ_URL,
+                        {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                        fallback_model, True
+                    )
                     continue
                 elif iteration == 0:
-                    # Sudah 70B tapi masih 400 → strip tool_calls dari history, retry tanpa tools
-                    logger.warning("🔄 400 pada 70B → retry tanpa tools")
-                    current = [m for m in current if m.get("role") != "tool" and "tool_calls" not in m]
+                    logger.warning("🔄 400 → retry tanpa tools")
+                    current      = [m for m in current if m.get("role") != "tool" and "tool_calls" not in m]
                     active_tools = []
                     continue
             resp.raise_for_status()
