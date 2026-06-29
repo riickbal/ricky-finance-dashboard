@@ -2119,9 +2119,9 @@ function updatePrices() {
 
 // ============================================================
 // API CONFIG — set to Mac Mini IP when running locally
-// Set null to skip API and use static data.js
+// Auto-detect: Tailscale/local → relative API, GitHub Pages → data.js fallback
 // ============================================================
-const API_URL = 'https://colleagues-ins-resistance-chemicals.trycloudflare.com'; // Cloudflare Tunnel
+const API_URL = (window.location.hostname === 'riickbal.github.io') ? null : '';
 
 // ============================================================
 // INIT — try API first, fallback to data.js, fallback to DEFAULT_STATE
@@ -2140,8 +2140,8 @@ function initDashboard(rawData) {
 
 (function() {
   // 1. Try Express API
-  if (API_URL) {
-    fetch(API_URL + '/api/data')
+  if (API_URL !== null) {
+    fetch((API_URL || '') + '/api/data')
       .then(r => { if (!r.ok) throw new Error('API error ' + r.status); return r.json(); })
       .then(data => {
         console.log('✅ Loaded from API:', API_URL);

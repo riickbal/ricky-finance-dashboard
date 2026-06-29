@@ -1054,8 +1054,7 @@ def exec_add_transaction(date_str, trx_type, category, account, amount, desc="")
         resp = requests.post(f"{FINANCE_URL}/api/transactions", json=payload, timeout=10)
         result = resp.json()
         if result.get("success"):
-            # Also sync data.js to GitHub
-            _sync_to_github(f"trx: {date_str} {category} {account} Rp{amount:,.0f}")
+            pass  # Dashboard reads live from API — no GitHub sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1066,7 +1065,7 @@ def exec_update_bank_balance(nick, balance) -> str:
         resp = requests.patch(f"{FINANCE_URL}/api/banks/{nick}", json={"balance": balance}, timeout=10)
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"bank: {nick} → Rp{balance:,.0f}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1306,7 +1305,7 @@ def exec_manage_bank(action, nick, name=None, cat=None, type_=None, acct=None, b
         else:
             return json.dumps({"error": "action harus create/update/delete"})
         if result.get("success"):
-            _sync_to_github(f"bank {action}: {nick}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1326,7 +1325,7 @@ def exec_manage_creditcard(action, name, issuer=None, limit=None, outstanding=No
             return json.dumps({"error": "action harus create/update/delete"})
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"CC {action}: {name}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1351,7 +1350,7 @@ def exec_manage_investment(action, ticker, platform=None, type_=None, qty=None, 
             return json.dumps({"error": "action harus create/update/delete"})
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"investment {action}: {ticker}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1373,7 +1372,7 @@ def exec_manage_loan(action, loan_type, lender=None, remaining=None, monthly=Non
             return json.dumps({"error": "action harus create/update/delete"})
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"loan {action}: {loan_type}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1391,7 +1390,7 @@ def exec_manage_budget(action, category, amount=None) -> str:
             return json.dumps({"error": "action harus create/update/delete"})
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"budget {action}: {category}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1409,13 +1408,13 @@ def exec_manage_transaction(action, trx_id, date_str=None, type_=None, category=
             return json.dumps({"error": "action harus update/delete"})
         result = resp.json()
         if result.get("success"):
-            _sync_to_github(f"trx {action}: {trx_id}")
+            pass  # no sync needed
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
-def _sync_to_github(commit_msg: str):
+def pass  # no sync needed:
     """Regenerate data.js from API and push to GitHub."""
     try:
         # Fetch full data from API
