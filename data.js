@@ -1,5 +1,5 @@
 // data.js — Auto-synced from Finance API
-// Last updated: 2026-06-28 20:54:13
+// Last updated: 2026-06-29 22:04:10
 // DO NOT EDIT MANUALLY — managed by Edith
 
 const FINANCE_DATA = {
@@ -22,8 +22,8 @@ const FINANCE_DATA = {
       "cat": "Bank",
       "type": "Tabungan",
       "acct": "****5062",
-      "balance": 790729.14,
-      "updated": "2026-06-26",
+      "balance": 878600.14,
+      "updated": "2026-06-28",
       "notes": null
     },
     {
@@ -42,8 +42,8 @@ const FINANCE_DATA = {
       "cat": "Bank",
       "type": "Payroll/Giro",
       "acct": "****4829",
-      "balance": 15405871.52,
-      "updated": "2026-06-27",
+      "balance": 15000000.52,
+      "updated": "2026-06-28",
       "notes": null
     },
     {
@@ -52,8 +52,8 @@ const FINANCE_DATA = {
       "cat": "Bank",
       "type": "Tabungan",
       "acct": "****3734",
-      "balance": 7414879,
-      "updated": "2026-06-25",
+      "balance": 7264879,
+      "updated": "2026-06-28",
       "notes": "Rekening KPR — auto-debit KPR Rp7,400,000 tiap tgl 7"
     },
     {
@@ -71,7 +71,7 @@ const FINANCE_DATA = {
       "nick": "Permata 598",
       "cat": "Bank",
       "type": "Tabungan",
-      "acct": "4144397598",
+      "acct": "****7598",
       "balance": 1808885,
       "updated": "2026-06-28",
       "notes": null
@@ -175,7 +175,7 @@ const FINANCE_DATA = {
     {
       "platform": "Stockbit",
       "ticker": "BBRI",
-      "type": "IDX Stocks",
+      "type": "Investment",
       "qty": 3200,
       "avgBuy": 3065.84,
       "currency": "IDR",
@@ -247,6 +247,24 @@ const FINANCE_DATA = {
       "account": "Permata 734",
       "amount": 150000,
       "desc": "Auto debit ke Permata 598"
+    },
+    {
+      "id": "t79",
+      "date": "2026-06-27",
+      "type": "Out",
+      "category": "Food",
+      "account": "BCA 062",
+      "amount": 30000,
+      "desc": "Warteg"
+    },
+    {
+      "id": "t78",
+      "date": "2026-06-27",
+      "type": "Out",
+      "category": "Payment",
+      "account": "BCA 968",
+      "amount": 100000,
+      "desc": "Top Up GoPay"
     },
     {
       "id": "t70",
