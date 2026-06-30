@@ -47,7 +47,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # ── Dual Engine ──────────────────────────────────────────────
 # 🏠 LOCAL  — Ollama (Qwen2.5:7b) — finance, transaksi, advice
 OLLAMA_URL    = "http://localhost:11434/v1/chat/completions"
-MODEL_FINANCE = "qwen2.5:7b"
+MODEL_FINANCE = "llama-3.3-70b-versatile"  # was: qwen2.5:7b (Ollama disabled)
 
 # ☁️ CLOUD  — Groq (Llama 3.3 70B) — market, news, TA, FX
 GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
@@ -62,7 +62,11 @@ MODEL_FAST    = MODEL_FINANCE
 MODEL_SMART   = MODEL_MARKET
 
 # Groups yang pakai Groq (data publik — aman di cloud)
-_GROQ_GROUPS  = {"market_fx", "market_stock", "market_crypto", "market_ta", "market_news"}
+_GROQ_GROUPS  = {  # All groups → Groq (Ollama disabled)
+    "market_fx", "market_stock", "market_crypto", "market_ta", "market_news",
+    "finance", "trx_write", "trx_read", "summary", "crud_bank", "crud_cc",
+    "crud_investment", "crud_loan", "crud_budget", "crud_trx", "receivables",
+}
 
 # ============================================================
 # ROUTING: model + tool group per intent
@@ -1884,14 +1888,14 @@ Output HANYA response yang sudah di-naturalize. Jangan tambah penjelasan. Jangan
         return raw_response
 
 def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = None, uid: int = 0) -> str:
-    """Dual-engine router: Ollama untuk finance, Groq untuk market/news."""
+    """Single-engine router: semua queries → Groq (128K ctx, gratis, cepat)."""
     import time, re as _re
 
     current      = messages.copy()
     active_tools = tools if tools else TOOL_GROUPS.get("summary", TOOLS)
 
     # Tentukan engine berdasarkan model
-    use_groq = (model == MODEL_MARKET)
+    use_groq = True  # All queries → Groq (Ollama disabled)
 
     if use_groq:
         # ── GROQ (cloud) ─────────────────────────────────────
@@ -1923,8 +1927,7 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
             "tool_choice": "auto",
             "temperature": 0.3,
             "max_tokens":  1024,
-            # Fix context window — Ollama default 4096 terlalu kecil, naik ke 16k
-            "options":     {"num_ctx": 16384} if not use_groq else {}
+            # Groq: tidak perlu options (cloud handles context)
         }
         # Handle Ollama connection refused (service belum jalan)
         try:
