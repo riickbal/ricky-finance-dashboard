@@ -5,16 +5,14 @@ set -e
 cd "/Users/ricky/Edith AI (Project)/Personal Finance Dashboard"
 
 echo "📦 Syncing with GitHub..."
-git stash 2>/dev/null || true
 rm -f .git/HEAD.lock .git/index.lock 2>/dev/null || true
-
-if git pull origin main --rebase 2>&1; then
-    git stash pop 2>/dev/null || true
-else
+# Discard local noise (.DS_Store, fuse files, dll) biar pull tidak blocked
+git checkout -- . 2>/dev/null || true
+git clean -fd backend/.fuse_hidden* 2>/dev/null || true
+git pull origin main --rebase || {
     echo "❌ Git pull failed"
-    git stash pop 2>/dev/null || true
     exit 1
-fi
+}
 
 echo "🔄 Restarting Finance API..."
 launchctl kickstart -k "gui/$(id -u)/com.edith.financeapi" 2>/dev/null || {
