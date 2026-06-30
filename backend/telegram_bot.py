@@ -352,10 +352,15 @@ CONTOH BENAR:
 ✅ Call get_credit_cards → baru sebut outstanding yang sebenarnya
 
 TRANSAKSI: Kalau Ricky mau catat transaksi:
-1. WAJIB panggil tool stage_transactions([...]) dulu — kirim semua sekaligus dalam array
-2. Tool akan tampilkan tabel konfirmasi ke Ricky secara otomatis
-3. Ricky konfirmasi → Python langsung execute — lo TIDAK perlu panggil add_transaction
-JANGAN tulis tabel manual. JANGAN panggil add_transaction langsung tanpa stage dulu.
+1. LANGSUNG call tool stage_transactions([...]) — jangan explain dulu, langsung execute
+2. Tool otomatis tampilkan tabel konfirmasi — lo tidak perlu nulis apapun sebelumnya
+3. Ricky konfirmasi → Python execute — lo TIDAK perlu panggil add_transaction
+
+⛔ DILARANG KERAS:
+- Nulis raw JSON atau syntax tool call di chat ("stage_transactions([{...}])")
+- Bilang "gua panggil tool dulu" sebelum execute — langsung aja
+- Nulis tabel manual sebelum/sesudah stage
+- amount negatif — SELALU positif (50rb → 50000, bukan -50000)
 
 NAMA REKENING — WAJIB pakai field "nick" dari data persis, DILARANG rekonstruksi nama sendiri.
 ❌ SALAH: BCA Digital, BCA (Digital), Blu by BCA, CIMB Niaga, Bank Permata
