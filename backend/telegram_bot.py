@@ -252,8 +252,8 @@ ALLOWED_USER_IDS = []
 # Daily brief jam 5 pagi WIB (UTC+7 = UTC 22:00 malam sebelumnya)
 DAILY_BRIEF_HOUR_UTC = 22
 
-MAX_HISTORY = 4        # 2 rounds back-and-forth — cukup untuk follow-up
-MAX_TOOL_RESULT = 2000 # Trim tool results — model ga perlu full JSON
+MAX_HISTORY = 3        # Max 3 messages (1.5 rounds) — cegah context bloat di 4096
+MAX_TOOL_RESULT = 1500 # Trim tool results agresif — jaga token budget
 MAX_STORED_RESP = 600  # Truncate assistant responses in history
 
 # ============================================================
@@ -281,11 +281,30 @@ def _memory_to_prompt() -> str:
     lines = [f"- {k}: {v}" for k, v in mem.items()]
     return "\n\n**MEMORY (hal yang lo tau tentang Ricky):**\n" + "\n".join(lines)
 
+def _fetch_valid_accounts() -> str:
+    """Fetch valid account nicks from DB untuk inject ke system prompt — cegah hallucination nama rekening."""
+    try:
+        banks = requests.get(f"{FINANCE_URL}/api/banks", timeout=3).json()
+        ccs   = requests.get(f"{FINANCE_URL}/api/creditcards", timeout=3).json()
+        bank_nicks = [b.get("nick", "") for b in banks.get("banks", []) if b.get("nick")]
+        cc_nicks   = [c.get("name", "") for c in ccs.get("cards", []) if c.get("name")]
+        lines = []
+        if bank_nicks:
+            lines.append(f"BANK (gunakan nick persis ini): {', '.join(bank_nicks)}")
+        if cc_nicks:
+            lines.append(f"KARTU KREDIT (gunakan name persis ini): {', '.join(cc_nicks)}")
+        return "\n".join(lines)
+    except Exception:
+        return ""  # Kalau API down, skip inject — jangan crash
+
 def build_system_prompt() -> str:
     from datetime import date
     today = date.today().strftime("%A, %d %B %Y")
     date_inject = f"\n\nHARINI: {today}. Kalau user sebut tanggal relatif ('kemarin', 'tadi', 'minggu lalu') → konversi ke YYYY-MM-DD berdasarkan tanggal ini. DEFAULT TAHUN = {date.today().year}.\n"
-    return BASE_SYSTEM_PROMPT + date_inject + _memory_to_prompt()
+    # Inject valid account names langsung dari DB — fix "BCA" vs "BCA 062" mismatch
+    accounts = _fetch_valid_accounts()
+    account_inject = f"\n\nAKUN VALID (WAJIB PAKAI PERSIS SEPERTI INI, TIDAK BOLEH MODIFIKASI):\n{accounts}\n" if accounts else ""
+    return BASE_SYSTEM_PROMPT + date_inject + account_inject + _memory_to_prompt()
 
 BASE_SYSTEM_PROMPT = """Lo adalah Edith — personal assistant finansial Ricky. Lo bukan bot biasa, lo udah kenal Ricky lama. Ngobrol kayak temen deket yang kebetulan jago finance: casual Jaksel, mix Indo-English, gua/lo, santai tapi tajam. Ada sense of humor, boleh nyentil dikit, tapi tetep on point. Jangan kaku, jangan robot.
 
@@ -1903,7 +1922,9 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
             "tools":       active_tools,
             "tool_choice": "auto",
             "temperature": 0.3,
-            "max_tokens":  1024
+            "max_tokens":  1024,
+            # Fix context window — Ollama default 4096 terlalu kecil, naik ke 16k
+            "options":     {"num_ctx": 16384} if not use_groq else {}
         }
         # Handle Ollama connection refused (service belum jalan)
         try:
