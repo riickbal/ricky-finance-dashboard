@@ -146,7 +146,7 @@ app.get('/api/banks', (req, res) => {
 // ============================================================
 app.get('/api/creditcards', (req, res) => {
   try {
-    const cards = db.prepare('SELECT name, issuer, limit_amt as limit, outstanding, due_date as dueDate, notes FROM credit_cards').all();
+    const cards = db.prepare('SELECT name, issuer, limit_amt as "limit", outstanding, due_date as dueDate, notes FROM credit_cards').all();
     const totalOutstanding = cards.reduce((s, c) => s + (c.outstanding || 0), 0);
     const totalLimit = cards.reduce((s, c) => s + (c.limit || 0), 0);
     res.json({ cards, totalOutstanding, totalLimit, utilization: totalLimit ? Math.round(totalOutstanding / totalLimit * 100) : 0 });
