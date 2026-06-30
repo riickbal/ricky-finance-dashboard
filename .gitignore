@@ -28,3 +28,6 @@ backend/.env*
 ALL_CODE.txt
 ricky-finance-dashboard/
 backend/haiku_spend.json
+
+# Fuse temp files
+**/.fuse_hidden*
