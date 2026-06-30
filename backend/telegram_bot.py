@@ -38,8 +38,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ============================================================
 # CONFIG
 # ============================================================
-BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+BOT_TOKEN         = os.getenv("TELEGRAM_BOT_TOKEN", "")
+GROQ_API_KEY      = os.getenv("GROQ_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 FINANCE_URL  = "http://localhost:3000"
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -51,6 +52,10 @@ MODEL_FINANCE = "qwen2.5:7b"
 # ☁️ CLOUD  — Groq (Llama 3.3 70B) — market, news, TA, FX
 GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_MARKET  = "llama-3.3-70b-versatile"
+
+# 🧠 POLISH  — Anthropic Haiku — language naturalizer (fallback only)
+HAIKU_URL     = "https://api.anthropic.com/v1/messages"
+MODEL_HAIKU   = "claude-haiku-4-5-20251001"
 
 # Alias untuk backward-compat dengan routing logic
 MODEL_FAST    = MODEL_FINANCE
@@ -277,7 +282,10 @@ def _memory_to_prompt() -> str:
     return "\n\n**MEMORY (hal yang lo tau tentang Ricky):**\n" + "\n".join(lines)
 
 def build_system_prompt() -> str:
-    return BASE_SYSTEM_PROMPT + _memory_to_prompt()
+    from datetime import date
+    today = date.today().strftime("%A, %d %B %Y")
+    date_inject = f"\n\nHARINI: {today}. Kalau user sebut tanggal relatif ('kemarin', 'tadi', 'minggu lalu') → konversi ke YYYY-MM-DD berdasarkan tanggal ini. DEFAULT TAHUN = {date.today().year}.\n"
+    return BASE_SYSTEM_PROMPT + date_inject + _memory_to_prompt()
 
 BASE_SYSTEM_PROMPT = """Lo adalah Edith — personal assistant finansial Ricky. Lo bukan bot biasa, lo udah kenal Ricky lama. Ngobrol kayak temen deket yang kebetulan jago finance: casual Jaksel, mix Indo-English, gua/lo, santai tapi tajam. Ada sense of humor, boleh nyentil dikit, tapi tetep on point. Jangan kaku, jangan robot.
 
@@ -300,7 +308,23 @@ JANGAN tulis tabel manual. JANGAN panggil add_transaction langsung tanpa stage d
 
 NAMA REKENING — WAJIB pakai field "nick" dari data persis, DILARANG rekonstruksi nama sendiri.
 ❌ SALAH: BCA Digital, BCA (Digital), Blu by BCA, CIMB Niaga, Bank Permata
-✅ BENAR: BLU 904, BCA 062, BCA 968, CIMB 200, Permata 734, Permata 829, Permata 598
+✅ BANK (tabungan/giro): BLU 904, BCA 062, BCA 968, Permata 734, Permata 829
+✅ KARTU KREDIT: CC Permata, CC CIMB — SELALU pakai prefix "CC"
+
+⚠️ KRITIS — BANK VS KARTU KREDIT, JANGAN SAMPAI SALAH:
+
+PERMATA (3 akun berbeda):
+• "CC Permata" = Kartu Kredit Permata (acct ****9447) → tagihan CC, belanja pakai kartu
+• "Permata 829" = Rekening Bank Giro/Payroll → transfer, debit bank biasa
+• "Permata 734" = Rekening Bank Tabungan → khusus auto-debit KPR tgl 7
+→ Kalau Ricky sebut "kartu kredit permata" / "CC permata" / "permata CC" → WAJIB "CC Permata", BUKAN "Permata 829"
+
+CIMB (2 akun berbeda):
+• "CC CIMB" = Kartu Kredit CIMB Niaga Syariah → tagihan CC, belanja pakai kartu
+• "CIMB 200" = Rekening Bank → transfer, cicilan KTA auto-debit ~tgl 23
+→ Kalau Ricky sebut "kartu kredit cimb" / "CC cimb" / "cimb CC" → WAJIB "CC CIMB", BUKAN "CIMB 200"
+
+RULE: Kata "CC" / "kartu kredit" → selalu ke credit_cards table. Transfer/debit/saldo → ke banks table.
 
 FORMAT TABEL — Telegram ga bisa render markdown table. Wajib code block, kolom harus rata:
 ```
@@ -422,7 +446,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "stage_transactions",
-            "description": "WAJIB dipanggil sebelum add_transaction. Tampilkan tabel konfirmasi ke user. Kirim semua transaksi sekaligus dalam satu array. User akan konfirmasi sebelum data disimpan.",
+            "description": "WAJIB dipanggil sebelum add_transaction. Tampilkan tabel konfirmasi ke user. Kirim semua transaksi sekaligus dalam satu array. User akan konfirmasi sebelum data disimpan. WAJIB sertakan semua field: date (YYYY-MM-DD, tahun HARUS sesuai konteks — default tahun sekarang), type (In/Out/Transfer), category, account (nick persis dari data, bukan rekonstruksi), amount, desc.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -463,6 +487,26 @@ TOOLS = [
                     "desc":     {"type": "string", "description": "Deskripsi transaksi"}
                 },
                 "required": ["date", "type", "category", "account", "amount"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_transaction",
+            "description": "Update/koreksi transaksi yang sudah ada di database. Pakai kalau user minta ubah tanggal, amount, kategori, atau deskripsi transaksi yang sudah tercatat. Panggil get_transactions dulu untuk dapat transaction ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id":       {"type": "string", "description": "Transaction ID dari database (format: t123...)"},
+                    "date":     {"type": "string", "description": "Tanggal baru YYYY-MM-DD (opsional)"},
+                    "type":     {"type": "string", "description": "In / Out / Transfer (opsional)"},
+                    "category": {"type": "string", "description": "Kategori baru (opsional)"},
+                    "account":  {"type": "string", "description": "Akun baru (opsional)"},
+                    "amount":   {"type": "number", "description": "Jumlah baru IDR (opsional)"},
+                    "desc":     {"type": "string", "description": "Deskripsi baru (opsional)"}
+                },
+                "required": ["id"]
             }
         }
     },
@@ -688,6 +732,26 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "manage_receivable",
+            "description": "Tambah, settle, atau hapus piutang. Gunakan saat Ricky bilang 'pinjamin X', 'catat piutang', 'X udah bayar balik', 'lunasin piutang', 'hapus piutang'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action":     {"type": "string", "enum": ["add","settle","delete"], "description": "add=tambah baru, settle=tandai lunas, delete=hapus"},
+                    "id":         {"type": "string", "description": "ID piutang (untuk settle/delete)"},
+                    "name":       {"type": "string", "description": "Nama orang (untuk add)"},
+                    "amount":     {"type": "number", "description": "Jumlah IDR"},
+                    "date":       {"type": "string", "description": "Tanggal YYYY-MM-DD"},
+                    "due_date":   {"type": "string", "description": "Jatuh tempo YYYY-MM-DD (opsional)"},
+                    "notes":      {"type": "string", "description": "Catatan"}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_fixed_assets",
             "description": "Ambil data aset tetap: properti, kendaraan, elektronik, dll. Termasuk book value setelah depresiasi.",
             "parameters": {"type": "object", "properties": {}, "required": []}
@@ -745,10 +809,10 @@ def _tools(*names):
     return [t for t in TOOLS if t["function"]["name"] in names]
 
 # Write tools yang selalu disertakan agar model ga pernah call tool yang ga ada
-_WRITE_CORE = ("stage_transactions", "add_transaction", "manage_bank", "manage_creditcard",
-               "manage_investment", "manage_loan", "manage_budget",
-               "manage_transaction", "update_bank_balance",
-               "save_memory", "get_memory")
+_WRITE_CORE = ("stage_transactions", "add_transaction", "update_transaction",
+               "manage_bank", "manage_creditcard", "manage_investment", "manage_loan",
+               "manage_budget", "manage_transaction", "manage_receivable",
+               "update_bank_balance", "save_memory", "get_memory")
 
 def _rw(*names):
     """Read tools + write core — model bisa baca DAN tulis."""
@@ -804,8 +868,8 @@ TOOL_GROUPS = {
     "income":         _rw("get_income"),
     "summary":        _rw("get_summary"),
     "trx_read":       _rw("get_transactions"),
-    "trx_write":      _rw("get_banks", "get_transactions", "stage_transactions"),
-    "receivables":    _rw("get_receivables"),
+    "trx_write":      _rw("get_banks", "get_transactions", "stage_transactions", "update_transaction"),
+    "receivables":    _rw("get_receivables", "manage_receivable"),
     "fixed_assets":   _rw("get_fixed_assets"),
     "expenses_mom":   _rw("get_expenses_compare"),
     "invest_pl":      _rw("get_investment_pl", "get_investments"),
@@ -907,6 +971,22 @@ def exec_get_summary() -> str:
 def exec_get_receivables() -> str:
     try:
         resp = requests.get(f"{FINANCE_URL}/api/receivables", timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def exec_manage_receivable(action: str, id: str = None, name: str = None, amount=None,
+                           date: str = None, due_date: str = None, notes: str = None) -> str:
+    try:
+        if action == "add":
+            payload = {"name": name, "amount": amount, "date": date, "due_date": due_date, "notes": notes}
+            resp = requests.post(f"{FINANCE_URL}/api/receivables", json=payload, timeout=10)
+        elif action == "settle":
+            resp = requests.patch(f"{FINANCE_URL}/api/receivables/{id}", json={"status": "settled"}, timeout=10)
+        elif action == "delete":
+            resp = requests.delete(f"{FINANCE_URL}/api/receivables/{id}", timeout=10)
+        else:
+            return json.dumps({"error": f"Unknown action: {action}"})
         return json.dumps(resp.json(), ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1056,6 +1136,15 @@ def exec_add_transaction(date_str, trx_type, category, account, amount, desc="")
         if result.get("success"):
             pass  # Dashboard reads live from API — no GitHub sync needed
         return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def exec_update_transaction(trx_id: str, **kwargs) -> str:
+    try:
+        payload = {k: v for k, v in kwargs.items() if v is not None}
+        resp = requests.put(f"{FINANCE_URL}/api/transactions/{trx_id}", json=payload, timeout=10)
+        return json.dumps(resp.json(), ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -1414,54 +1503,8 @@ def exec_manage_transaction(action, trx_id, date_str=None, type_=None, category=
         return json.dumps({"error": str(e)})
 
 
-def pass  # no sync needed:
-    """Regenerate data.js from API and push to GitHub."""
-    try:
-        # Fetch full data from API
-        resp = requests.get(f"{FINANCE_URL}/api/data", timeout=10)
-        api_data = resp.json()
-
-        # Read current data.js to preserve structure
-        data_js_path = PROJECT_ROOT / "data.js"
-        if not data_js_path.exists():
-            logger.warning("data.js not found, skipping GitHub sync")
-            return
-
-        # Write updated data.js
-        js_content = f"""// data.js — Auto-synced from Finance API
-// Last updated: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-// DO NOT EDIT MANUALLY — managed by Edith
-
-const FINANCE_DATA = {json.dumps(api_data, ensure_ascii=False, indent=2)};
-
-if (typeof window !== 'undefined') {{
-  window.EDITH_API_DATA = FINANCE_DATA;
-}}
-"""
-        data_js_path.write_text(js_content, encoding="utf-8")
-
-        # Git push — set HOME/PATH eksplisit biar launchctl punya credentials
-        _env = {
-            **os.environ,
-            "HOME": str(_Path.home()),
-            "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-            "GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=no"
-        }
-        # Remove stale lock if exists
-        lock = PROJECT_ROOT / ".git" / "index.lock"
-        if lock.exists(): lock.unlink()
-
-        subprocess.run(["git", "add", "data.js"], cwd=PROJECT_ROOT, check=True, capture_output=True, env=_env)
-        result = subprocess.run(
-            ["git", "commit", "-m", f"[Edith] {commit_msg}"],
-            cwd=PROJECT_ROOT, capture_output=True, env=_env
-        )
-        if result.returncode not in (0, 1):  # 1 = nothing to commit, ok
-            raise Exception(result.stderr.decode())
-        subprocess.run(["git", "push"], cwd=PROJECT_ROOT, check=True, capture_output=True, env=_env)
-        logger.info(f"✅ GitHub synced: {commit_msg}")
-    except Exception as e:
-        logger.warning(f"⚠️ GitHub sync failed (non-critical): {e}")
+def _sync_to_github(commit_msg: str = "update"):
+    pass  # no sync needed — data live via SQLite API
 
 
 # ============================================================
@@ -1547,6 +1590,16 @@ def execute_tool(name: str, args: dict, uid: int = 0) -> str:
         result = exec_get_summary()
     elif name == "get_receivables":
         result = exec_get_receivables()
+    elif name == "manage_receivable":
+        result = exec_manage_receivable(
+            action=args.get("action",""),
+            id=args.get("id"),
+            name=args.get("name"),
+            amount=_num(args.get("amount")) if args.get("amount") is not None else None,
+            date=_date(args.get("date")) if args.get("date") else None,
+            due_date=args.get("due_date"),
+            notes=args.get("notes")
+        )
     elif name == "get_fixed_assets":
         result = exec_get_fixed_assets()
     elif name == "get_expenses_compare":
@@ -1569,6 +1622,16 @@ def execute_tool(name: str, args: dict, uid: int = 0) -> str:
             account=args.get("account", ""),
             amount=_num(args.get("amount"), 0),
             desc=args.get("desc", "")
+        )
+    elif name == "update_transaction":
+        result = exec_update_transaction(
+            trx_id=args.get("id", ""),
+            date=args.get("date"),
+            type=args.get("type"),
+            category=args.get("category"),
+            account=args.get("account"),
+            amount=_num(args.get("amount"), None) if args.get("amount") is not None else None,
+            desc=args.get("desc")
         )
     elif name == "update_bank_balance":
         result = exec_update_bank_balance(
@@ -1653,6 +1716,133 @@ def _call_api(url: str, payload: dict, headers: dict) -> requests.Response:
     """Single API call dengan proper timeout."""
     return requests.post(url, json=payload, headers=headers, timeout=120)
 
+# ============================================================
+# HAIKU QUALITY POLISH
+# ============================================================
+# Flag — di-set False kalau kredit habis, reset manual atau restart bot
+_haiku_available: bool = True
+
+# ── Haiku credit tracker ─────────────────────────────────────
+_HAIKU_BUDGET_USD   = 5.00          # top-up awal
+_HAIKU_PRICE_IN     = 0.80 / 1e6   # $0.80 per 1M input tokens
+_HAIKU_PRICE_OUT    = 4.00 / 1e6   # $4.00 per 1M output tokens
+_HAIKU_SPEND_FILE   = _Path(__file__).parent / "haiku_spend.json"
+
+def _load_haiku_spend() -> float:
+    try:
+        return float(json.loads(_HAIKU_SPEND_FILE.read_text()).get("spent", 0))
+    except: return 0.0
+
+def _add_haiku_spend(input_tok: int, output_tok: int):
+    cost = input_tok * _HAIKU_PRICE_IN + output_tok * _HAIKU_PRICE_OUT
+    spent = _load_haiku_spend() + cost
+    _HAIKU_SPEND_FILE.write_text(json.dumps({"spent": round(spent, 6)}))
+    return spent
+
+def haiku_credit_status() -> str:
+    spent = _load_haiku_spend()
+    remaining = max(_HAIKU_BUDGET_USD - spent, 0)
+    pct = spent / _HAIKU_BUDGET_USD * 100
+    bar = "█" * int(pct // 10) + "░" * (10 - int(pct // 10))
+    status = "✅" if remaining > 1 else ("⚠️" if remaining > 0.5 else "🔴")
+    return (f"{status} Haiku credit: ${remaining:.3f} sisa dari ${_HAIKU_BUDGET_USD:.2f}\n"
+            f"[{bar}] {pct:.1f}% terpakai (${spent:.4f})")
+
+_ROBOT_PHRASES = [
+    "tentu!", "baik!", "siap!", "berikut adalah", "berikut ini",
+    "dengan senang hati", "saya akan", "saya siap", "sebagai asisten",
+    "perlu diketahui", "perlu dicatat bahwa", "mohon maaf",
+    "terima kasih telah", "semoga membantu",
+]
+
+def _is_robot_response(text: str) -> bool:
+    """Detect kalau response Qwen terlalu robot/kaku."""
+    if not text or len(text) < 10:
+        return True
+    low = text.lower()
+    # Kata-kata robot
+    if any(p in low for p in _ROBOT_PHRASES):
+        return True
+    # JSON mentah keliatan di response
+    if text.strip().startswith("{") or text.strip().startswith("["):
+        return True
+    return False
+
+def _notify_telegram(text: str):
+    """Kirim notif langsung ke Ricky via Bot API (sync). Ambil chat_id dari histories."""
+    if not BOT_TOKEN:
+        return
+    # Ambil semua uid yang pernah chat — kirim ke semua (biasanya cuma Ricky)
+    for uid in list(histories.keys()):
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": uid, "text": text, "parse_mode": "Markdown"},
+                timeout=5
+            )
+        except Exception:
+            pass
+
+def _haiku_polish(raw_response: str, tool_results: str, user_msg: str) -> str:
+    """Kirim raw Qwen output ke Haiku untuk naturalize bahasa. Cost ~$0.001/call."""
+    global _haiku_available
+    if not ANTHROPIC_API_KEY or not _haiku_available:
+        return raw_response  # Ga ada key atau kredit habis → return as-is
+
+    polish_prompt = f"""Lo adalah Edith, personal finance assistant Ricky. Rewrite response ini supaya natural Jaksel (gua/lo, mix Indo-English, santai tapi tajam). Jangan ubah angka atau data — cuma perbaiki bahasa dan tone.
+
+Data dari tools:
+{tool_results[:800] if tool_results else '(none)'}
+
+User nanya: {user_msg[:200]}
+
+Response yang perlu di-naturalize:
+{raw_response[:1000]}
+
+Output HANYA response yang sudah di-naturalize. Jangan tambah penjelasan. Jangan mulai dengan "Tentu", "Baik", "Siap"."""
+
+    try:
+        resp = requests.post(
+            HAIKU_URL,
+            json={
+                "model": MODEL_HAIKU,
+                "max_tokens": 600,
+                "messages": [{"role": "user", "content": polish_prompt}]
+            },
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            timeout=15
+        )
+        if resp.ok:
+            data   = resp.json()
+            result = data["content"][0]["text"].strip()
+            usage  = data.get("usage", {})
+            spent  = _add_haiku_spend(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+            remaining = max(_HAIKU_BUDGET_USD - spent, 0)
+            logger.info(f"✨ Haiku polish applied | sisa kredit: ${remaining:.3f}")
+            # Warning kalau kredit tinggal <$1
+            if remaining < 1.0 and remaining > 0:
+                _notify_telegram(f"⚠️ *Haiku credit warning*\nSisa kredit: *${remaining:.2f}* — hampir habis.\nTop up di console.anthropic.com")
+            return result
+        else:
+            err = resp.json().get("error", {})
+            if "credit" in err.get("message", "").lower() or "balance" in err.get("message", "").lower():
+                _haiku_available = False
+                logger.warning("💸 Haiku kredit habis — disabled, fallback ke Qwen")
+                _notify_telegram(
+                    "⚠️ *Edith Notice*\nKredit Haiku habis — gua balik ke mode Qwen dulu.\n"
+                    "Top up di console.anthropic.com kalau mau Haiku aktif lagi."
+                )
+            else:
+                logger.warning(f"⚠️ Haiku polish failed {resp.status_code} → pakai Qwen response")
+            return raw_response
+    except Exception as e:
+        logger.warning(f"⚠️ Haiku polish error: {e} → pakai Qwen response")
+        return raw_response
+
 def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = None, uid: int = 0) -> str:
     """Dual-engine router: Ollama untuk finance, Groq untuk market/news."""
     import time, re as _re
@@ -1682,6 +1872,8 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
 
     current_model  = primary_model
     _executed_writes: set = set()
+    _tool_results_log: list = []  # collect tool results for Haiku polish context
+    _user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
 
     for iteration in range(6):  # max 6 tool-call iterations
         payload = {
@@ -1751,7 +1943,12 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
-            return content or "Maaf, ga ada respons."
+            final = content or "Maaf, ga ada respons."
+            # Haiku polish: always apply untuk Ollama path (Qwen output selalu di-naturalize)
+            if not use_groq and ANTHROPIC_API_KEY and _haiku_available:
+                tool_ctx = "\n".join(_tool_results_log[-3:])
+                final = _haiku_polish(final, tool_ctx, _user_msg)
+            return final
 
         # Append assistant message (with tool_calls intact)
         current.append({
@@ -1781,6 +1978,7 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
             # Truncate large results to avoid 413 Payload Too Large
             if len(result) > MAX_TOOL_RESULT:
                 result = result[:MAX_TOOL_RESULT] + "\n...[truncated]"
+            _tool_results_log.append(f"{name}: {result[:300]}")
             logger.info(f"✅ Tool result: {result[:120]}...")
             # OpenAI format requires tool_call_id
             current.append({
@@ -1968,12 +2166,16 @@ async def send_daily_brief(context: ContextTypes.DEFAULT_TYPE):
             f"{alert_block}"
         )
 
+        # --- Haiku credit status ---
+        credit_info = haiku_credit_status() if ANTHROPIC_API_KEY else ""
+
         # --- Kirim 2 pesan ---
         for uid, chat_id in subscribers.items():
             try:
                 await context.bot.send_message(chat_id=chat_id, text=chat1,
                                                parse_mode="MarkdownV2", disable_web_page_preview=True)
-                await context.bot.send_message(chat_id=chat_id, text=chat2,
+                msg2 = chat2 + (f"\n\n{credit_info}" if credit_info else "")
+                await context.bot.send_message(chat_id=chat_id, text=msg2,
                                                parse_mode="Markdown")
             except Exception as e:
                 logger.error(f"Failed to send brief to {uid}: {e}")

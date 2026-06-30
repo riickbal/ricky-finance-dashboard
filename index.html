@@ -237,6 +237,7 @@ tr:hover .del-btn{opacity:1;}
       <button class="lang-btn" id="lang-en" onclick="setLang('EN')">EN</button>
     </div>
     <div class="topbar-right" id="lastUpdated">—</div>
+    <div id="sync-status" style="font-size:11px;opacity:0.6;padding:0 8px;cursor:pointer" onclick="fetchAndRefresh(false)" title="Klik untuk sync manual">○ Sync...</div>
   </div>
   <div class="nav-tabs">
     <div class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</div>
@@ -1133,9 +1134,9 @@ function computed() {
   const fixedAssetsComp = (S.fixedAssets||[]).map(fa=>{
     const pd = new Date(fa.purchaseDate);
     const me = (refDate.getFullYear()-pd.getFullYear())*12+(refDate.getMonth()-pd.getMonth())+1;
-    const mdep = fa.cost/fa.usefulLifeMonths;
-    const adep = Math.min(me*mdep,fa.cost);
-    const bv = Math.max(fa.cost-adep,0);
+    const mdep = (fa.usefulLifeMonths > 0) ? fa.cost/fa.usefulLifeMonths : 0;
+    const adep = (fa.usefulLifeMonths > 0) ? Math.min(me*mdep,fa.cost) : 0;
+    const bv   = (fa.usefulLifeMonths > 0) ? Math.max(fa.cost-adep,0) : fa.cost;
     const rm = Math.max(fa.usefulLifeMonths-me,0);
     return {...fa, monthsElapsed:me, monthlyDep:mdep, accumulatedDep:adep, bookValue:bv, remainingMonths:rm};
   });
@@ -2121,7 +2122,7 @@ function updatePrices() {
 // API CONFIG — set to Mac Mini IP when running locally
 // Auto-detect: Tailscale/local → relative API, GitHub Pages → data.js fallback
 // ============================================================
-const API_URL = (window.location.hostname === 'riickbal.github.io') ? null : '';
+const API_URL = ''; // Always local/Tailscale — GitHub Pages is static backup only
 
 // ============================================================
 // INIT — try API first, fallback to data.js, fallback to DEFAULT_STATE
@@ -2138,31 +2139,119 @@ function initDashboard(rawData) {
   setInterval(updatePrices, 6*60*60*1000);
 }
 
-(function() {
-  // 1. Try Express API
-  if (API_URL !== null) {
-    fetch((API_URL || '') + '/api/data')
-      .then(r => { if (!r.ok) throw new Error('API error ' + r.status); return r.json(); })
-      .then(data => {
-        console.log('✅ Loaded from API:', API_URL);
-        initDashboard(data);
-      })
-      .catch(err => {
-        console.warn('⚠️ API unreachable, falling back to data.js:', err.message);
-        loadDataJs();
-      });
-    return;
-  }
-  // 2. Fallback: static data.js
-  loadDataJs();
+// ============================================================
+// LIVE SYNC — fetch fresh data from API, preserve UI state
+// ============================================================
+let _syncIndicator = null;
+let _lastSyncData  = null;
+const _CACHE_KEY   = 'financeCache';
 
-  function loadDataJs() {
-    const s = document.createElement('script');
-    s.src = 'data.js?t=' + Date.now();
-    s.onload = () => initDashboard();
-    s.onerror = () => { console.warn('⚠️ data.js failed, using DEFAULT_STATE'); initDashboard(); };
-    document.head.appendChild(s);
+function _setSyncStatus(ok, label) {
+  if (!_syncIndicator) _syncIndicator = document.getElementById('sync-status');
+  if (!_syncIndicator) return;
+  const now = new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
+  if (ok) {
+    _syncIndicator.textContent = '● Live ' + now;
+    _syncIndicator.style.color = 'var(--pos)';
+  } else {
+    _syncIndicator.textContent = label || '○ Offline';
+    _syncIndicator.style.color = 'var(--neg)';
   }
+}
+
+function _saveCache(data) {
+  try {
+    localStorage.setItem(_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch(e) {}
+}
+
+function _loadCache() {
+  try {
+    const raw = localStorage.getItem(_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function fetchAndRefresh(silent) {
+  fetch('/api/data?t=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      const prev = JSON.stringify(_lastSyncData);
+      const next = JSON.stringify(data);
+      _lastSyncData = data;
+      _saveCache(data);
+      _setSyncStatus(true);
+      if (prev !== next) {
+        window.DASHBOARD_DATA = data;
+        loadState();
+        renderAll();
+      }
+    })
+    .catch(err => {
+      _setSyncStatus(false, '○ Offline');
+      if (!silent) console.warn('⚠️ Sync failed:', err.message);
+    });
+}
+
+// SSE — instant push dari server saat data berubah
+function startSSE() {
+  const es = new EventSource('/api/events');
+  es.addEventListener('update', () => fetchAndRefresh(true));
+  es.addEventListener('connected', () => console.log('📡 SSE connected'));
+  es.onerror = () => {
+    // SSE error → fallback ke polling
+    es.close();
+    startPolling();
+  };
+}
+
+// Polling fallback (30 detik) — aktif kalau SSE gagal
+function startPolling() {
+  setInterval(() => fetchAndRefresh(true), 30000);
+}
+
+// Auto-refresh: SSE dulu, fallback polling
+function startAutoSync() {
+  if (typeof EventSource !== 'undefined') {
+    startSSE();
+  } else {
+    startPolling();
+  }
+}
+
+(function() {
+  fetch('/api/data?t=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error('API error ' + r.status); return r.json(); })
+    .then(data => {
+      _lastSyncData = data;
+      _saveCache(data);
+      initDashboard(data);
+      _setSyncStatus(true);
+      startAutoSync();
+    })
+    .catch(err => {
+      console.warn('⚠️ API unreachable, trying cache:', err.message);
+      const cached = _loadCache();
+      if (cached) {
+        const age = Math.round((Date.now() - cached.ts) / 60000);
+        const label = `○ Cache ${age}m ago`;
+        _lastSyncData = cached.data;
+        initDashboard(cached.data);
+        _setSyncStatus(false, label);
+        // Tetap coba reconnect setiap 30 detik
+        startAutoSync();
+      } else {
+        _setSyncStatus(false, '○ Offline');
+        document.body.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#94a3b8;gap:16px">
+            <div style="font-size:48px">⚠️</div>
+            <div style="font-size:20px;color:#f1f5f9">Finance API offline</div>
+            <div style="font-size:14px">Server tidak jalan & tidak ada cache tersimpan</div>
+            <button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4f7cff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">Retry</button>
+          </div>`;
+      }
+    });
 })();
 </script>
 </body>

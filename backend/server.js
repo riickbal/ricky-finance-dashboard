@@ -13,6 +13,21 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 const db   = new DatabaseSync(path.join(__dirname, 'finance.db'));
 
+// WAL mode — prevents deadlock kalau bot & server tulis bersamaan
+db.exec('PRAGMA journal_mode=WAL');
+db.exec('PRAGMA synchronous=NORMAL');
+db.exec('PRAGMA busy_timeout=5000');
+
+// SSE clients list
+const sseClients = new Set();
+
+// Helper — broadcast update ke semua dashboard yang terbuka
+function broadcastUpdate(event = 'update') {
+  for (const res of sseClients) {
+    try { res.write(`event: ${event}\ndata: ${Date.now()}\n\n`); } catch(_) {}
+  }
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -230,10 +245,19 @@ app.get('/api/summary', (req, res) => {
     const cc          = db.prepare('SELECT SUM(outstanding) as out, SUM(limit_amt) as lim FROM credit_cards').get();
     const loans       = db.prepare('SELECT SUM(remaining) as rem, SUM(monthly) as mon FROM loans').get();
     const investments = db.prepare('SELECT SUM(cost_basis) as cost FROM investments').get();
-
+    // Hitung book value semua fixed assets (cost - accumulated depreciation)
+    const fixedRows = db.prepare('SELECT cost, useful_life_months, purchase_date FROM fixed_assets').all();
+    const now = new Date();
+    const totalFixedAssets = fixedRows.reduce((sum, fa) => {
+      const pd = new Date(fa.purchase_date);
+      const monthsOwned = Math.floor((now - pd) / (1000 * 60 * 60 * 24 * 30));
+      const accumulated = (fa.useful_life_months > 0)
+        ? Math.min(fa.cost, (fa.cost / fa.useful_life_months) * monthsOwned) : 0;
+      return sum + Math.max(fa.cost - accumulated, 0);
+    }, 0);
     const totalCash        = banks.total || 0;
     const totalInvestments = investments.cost || 0;
-    const totalAssets      = totalCash + totalInvestments;
+    const totalAssets      = totalCash + totalInvestments + totalFixedAssets;
     const totalLiabilities = (cc.out || 0) + (loans.rem || 0);
     const netWorth         = totalAssets - totalLiabilities;
     const totalMonthly     = loans.mon || 0;
@@ -247,7 +271,7 @@ app.get('/api/summary', (req, res) => {
 
     res.json({
       netWorth, totalAssets, totalLiabilities,
-      totalCash, totalInvestments,
+      totalCash, totalInvestments, totalFixedAssets,
       totalCC: cc.out || 0, totalLoans: loans.rem || 0,
       dti, ccUtilization: ccUtil,
       cashFlow, netIncome,
@@ -267,9 +291,18 @@ app.get('/api/summary', (req, res) => {
 app.post('/api/transactions', (req, res) => {
   try {
     const { date, type, category, account, amount, desc } = req.body;
-    if (!date || !type || !category || !account || amount == null) {
+    if (!date || !type || !category || !account || amount == null)
       return res.status(400).json({ error: 'Missing required fields: date, type, category, account, amount' });
-    }
+    // Validation
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      return res.status(400).json({ error: `Invalid date format: "${date}". Use YYYY-MM-DD.` });
+    if (!['In','Out','Transfer','Accrual'].includes(type))
+      return res.status(400).json({ error: `Invalid type: "${type}". Use In/Out/Transfer/Accrual.` });
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) < 0)
+      return res.status(400).json({ error: `Invalid amount: "${amount}". Must be a positive number.` });
+    const year = parseInt(date.slice(0,4));
+    if (year < 2020 || year > 2030)
+      return res.status(400).json({ error: `Suspicious year: ${year}. Cek tanggal transaksi.` });
     const id = req.body.id || nextTrxId();
     db.prepare(`
       INSERT OR REPLACE INTO transactions (id, date, type, category, account, amount, desc)
@@ -287,6 +320,7 @@ app.post('/api/transactions', (req, res) => {
     }
 
     console.log(`✅ Transaction added: ${id} | ${date} | ${type} | ${category} | ${account} | ${amount}`);
+    broadcastUpdate();
     res.status(201).json({ success: true, id, message: `Transaction ${id} saved` });
   } catch (e) {
     console.error(e);
@@ -306,6 +340,7 @@ app.patch('/api/banks/:nick', (req, res) => {
     const date = updated || new Date().toISOString().split('T')[0];
     db.prepare('UPDATE banks SET balance = ?, updated = ? WHERE nick = ?').run(balance, date, nick);
     console.log(`✅ Bank updated: ${nick} → Rp${balance.toLocaleString('id-ID')}`);
+    broadcastUpdate();
     res.json({ success: true, nick, balance });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -323,6 +358,7 @@ app.patch('/api/creditcards/:name', (req, res) => {
     if (outstanding == null) return res.status(400).json({ error: 'outstanding required' });
     db.prepare('UPDATE credit_cards SET outstanding = ? WHERE name = ?').run(outstanding, name);
     console.log(`✅ CC updated: ${name} → outstanding Rp${outstanding.toLocaleString('id-ID')}`);
+    broadcastUpdate();
     res.json({ success: true, name, outstanding });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -346,6 +382,7 @@ app.patch('/api/investments/:ticker', (req, res) => {
     params.push(new Date().toISOString().split('T')[0], ticker);
     db.prepare(sql).run(...params);
     console.log(`✅ Investment updated: ${ticker} → price ${currentPrice}`);
+    broadcastUpdate();
     res.json({ success: true, ticker, currentPrice });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -362,6 +399,7 @@ app.patch('/api/fxrate', (req, res) => {
     if (!fxRate) return res.status(400).json({ error: 'fxRate required' });
     db.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)').run('fxRate', String(fxRate));
     console.log(`✅ FX Rate updated: ${fxRate}`);
+    broadcastUpdate();
     res.json({ success: true, fxRate });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -420,6 +458,7 @@ app.post('/api/banks', (req, res) => {
     `).run(name, nick, cat||'Bank', type||'Tabungan', acct||'', balance||0,
            new Date().toISOString().split('T')[0], notes||null);
     console.log(`✅ Bank created: ${nick}`);
+    broadcastUpdate();
     res.status(201).json({ success: true, nick });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -435,6 +474,7 @@ app.put('/api/banks/:nick', (req, res) => {
     `).run(name||null, cat||null, type||null, acct||null, balance??null, notes||null,
            new Date().toISOString().split('T')[0], nick);
     console.log(`✅ Bank updated: ${nick}`);
+    broadcastUpdate();
     res.json({ success: true, nick });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -444,6 +484,7 @@ app.delete('/api/banks/:nick', (req, res) => {
     const { nick } = req.params;
     db.prepare('DELETE FROM banks WHERE nick = ?').run(nick);
     console.log(`🗑️ Bank deleted: ${nick}`);
+    broadcastUpdate();
     res.json({ success: true, nick });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -460,6 +501,7 @@ app.post('/api/creditcards', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(name, issuer, limit||0, outstanding||0, dueDate||'', notes||null);
     console.log(`✅ CC created: ${name}`);
+    broadcastUpdate();
     res.status(201).json({ success: true, name });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -474,6 +516,7 @@ app.put('/api/creditcards/:name', (req, res) => {
       notes=COALESCE(?,notes) WHERE name=?
     `).run(issuer||null, limit??null, outstanding??null, dueDate||null, notes||null, name);
     console.log(`✅ CC updated: ${name}`);
+    broadcastUpdate();
     res.json({ success: true, name });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -483,6 +526,7 @@ app.delete('/api/creditcards/:name', (req, res) => {
     const { name } = req.params;
     db.prepare('DELETE FROM credit_cards WHERE name = ?').run(name);
     console.log(`🗑️ CC deleted: ${name}`);
+    broadcastUpdate();
     res.json({ success: true, name });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -502,6 +546,7 @@ app.post('/api/investments', (req, res) => {
            costBasis||0, currentPrice||0, platformCash||0,
            new Date().toISOString().split('T')[0], notes||null);
     console.log(`✅ Investment created: ${ticker}`);
+    broadcastUpdate();
     res.status(201).json({ success: true, ticker });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -520,6 +565,7 @@ app.put('/api/investments/:ticker', (req, res) => {
            costBasis??null, currentPrice??null, platformCash??null, notes||null,
            new Date().toISOString().split('T')[0], ticker);
     console.log(`✅ Investment updated: ${ticker}`);
+    broadcastUpdate();
     res.json({ success: true, ticker });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -529,6 +575,7 @@ app.delete('/api/investments/:ticker', (req, res) => {
     const { ticker } = req.params;
     db.prepare('DELETE FROM investments WHERE ticker = ?').run(ticker);
     console.log(`🗑️ Investment deleted: ${ticker}`);
+    broadcastUpdate();
     res.json({ success: true, ticker });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -545,6 +592,7 @@ app.post('/api/loans', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(type, lender, remaining||0, monthly||0, rate||0, tenor||0, notes||null);
     console.log(`✅ Loan created: ${type} - ${lender}`);
+    broadcastUpdate();
     res.status(201).json({ success: true, type });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -559,6 +607,7 @@ app.put('/api/loans/:type', (req, res) => {
       notes=COALESCE(?,notes) WHERE type=?
     `).run(lender||null, remaining??null, monthly??null, rate??null, tenor??null, notes||null, type);
     console.log(`✅ Loan updated: ${type}`);
+    broadcastUpdate();
     res.json({ success: true, type });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -568,6 +617,7 @@ app.delete('/api/loans/:type', (req, res) => {
     const { type } = req.params;
     db.prepare('DELETE FROM loans WHERE type = ?').run(type);
     console.log(`🗑️ Loan deleted: ${type}`);
+    broadcastUpdate();
     res.json({ success: true, type });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -580,6 +630,7 @@ app.delete('/api/budgets/:category', (req, res) => {
     const cat = decodeURIComponent(req.params.category);
     db.prepare('DELETE FROM budgets WHERE category = ?').run(cat);
     console.log(`🗑️ Budget deleted: ${cat}`);
+    broadcastUpdate();
     res.json({ success: true, category: cat });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -597,6 +648,7 @@ app.put('/api/transactions/:id', (req, res) => {
       amount=COALESCE(?,amount), desc=COALESCE(?,desc) WHERE id=?
     `).run(date||null, type||null, category||null, account||null, amount??null, desc||null, id);
     console.log(`✅ Transaction updated: ${id}`);
+    broadcastUpdate();
     res.json({ success: true, id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -606,6 +658,7 @@ app.delete('/api/transactions/:id', (req, res) => {
     const { id } = req.params;
     db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
     console.log(`🗑️ Transaction deleted: ${id}`);
+    broadcastUpdate();
     res.json({ success: true, id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -620,6 +673,47 @@ app.get('/api/receivables', (req, res) => {
     const settled  = rows.filter(r => r.status === 'settled');
     const totalActive = active.reduce((s, r) => s + (r.amount || 0), 0);
     res.json({ receivables: rows, active, settled, totalActive });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/receivables', (req, res) => {
+  try {
+    const { name, amount, date, due_date, notes } = req.body;
+    if (!name || !amount) return res.status(400).json({ error: 'name and amount required' });
+    const id = `rcv${Date.now()}`;
+    db.prepare(`INSERT INTO receivables (id,name,amount,date,due_date,notes,status)
+      VALUES (?,?,?,?,?,?,'outstanding')`
+    ).run(id, name, amount, date || new Date().toISOString().split('T')[0], due_date||null, notes||null);
+    console.log(`✅ Receivable created: ${id} - ${name} Rp${amount}`);
+    broadcastUpdate();
+    res.status(201).json({ success: true, id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/receivables/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, settled_on, amount, due_date, notes } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+    db.prepare(`UPDATE receivables SET
+      status=COALESCE(?,status), settled_on=COALESCE(?,settled_on),
+      amount=COALESCE(?,amount), due_date=COALESCE(?,due_date), notes=COALESCE(?,notes)
+      WHERE id=?`
+    ).run(status||null, settled_on || (status==='settled' ? today : null),
+          amount??null, due_date||null, notes||null, id);
+    console.log(`✅ Receivable updated: ${id} → ${status||'updated'}`);
+    broadcastUpdate();
+    res.json({ success: true, id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/receivables/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM receivables WHERE id = ?').run(id);
+    console.log(`🗑️ Receivable deleted: ${id}`);
+    broadcastUpdate();
+    res.json({ success: true, id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -640,6 +734,45 @@ app.get('/api/fixed-assets', (req, res) => {
     });
     const totalBookValue = assets.reduce((s, a) => s + a.bookValue, 0);
     res.json({ fixedAssets: assets, totalBookValue });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// POST /api/fixed-assets — tambah aset tetap baru
+// Body: { name, category, purchase_date, cost, useful_life_months, notes }
+// ============================================================
+app.post('/api/fixed-assets', (req, res) => {
+  try {
+    const { name, category, purchase_date, cost, useful_life_months, notes } = req.body;
+    if (!name || !category || !purchase_date || cost == null) {
+      return res.status(400).json({ error: 'Missing required fields: name, category, purchase_date, cost' });
+    }
+    const id = `fa${Date.now()}`;
+    db.prepare(`
+      INSERT INTO fixed_assets (id, name, category, purchase_date, cost, useful_life_months, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, category, purchase_date, cost, useful_life_months || 0, notes || null);
+    res.json({ success: true, id, name, cost });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// PATCH /api/fixed-assets/:id — update aset tetap
+// ============================================================
+app.patch('/api/fixed-assets/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = ['name','category','purchase_date','cost','useful_life_months','notes'];
+    const updates = [];
+    const vals = [];
+    for (const f of fields) {
+      if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }
+    }
+    if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
+    vals.push(id);
+    db.prepare(`UPDATE fixed_assets SET ${updates.join(', ')} WHERE id = ?`).run(...vals);
+    const row = db.prepare('SELECT * FROM fixed_assets WHERE id = ?').get(id);
+    res.json({ success: true, ...row });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -710,6 +843,19 @@ app.get('/api/investments/pl', (req, res) => {
       totalPLPct: totalCost > 0 ? Math.round((totalValue - totalCost) / totalCost * 100 * 10) / 10 : 0
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================================
+// SSE — push instant update ke dashboard saat data berubah
+// ============================================================
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  res.write('event: connected\ndata: ok\n\n');
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
 });
 
 // ============================================================
