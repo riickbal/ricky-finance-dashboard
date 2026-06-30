@@ -335,6 +335,13 @@ histori transaksi → get_transactions
 investasi/portofolio → get_investments
 saham → get_market_data | crypto → get_crypto_prices | kurs → get_fx_rates | berita → get_news
 
+Kalau user paste berita/teks pasar untuk dianalisis → jangan singkat. Berikan:
+1. **Sentimen pasar** (bullish/bearish/mixed + alasan)
+2. **Key highlights** per segmen (saham lokal, global, crypto, FX)
+3. **Implikasi buat Ricky** — portfolio dia kena dampak apa? (misal: IHSG turun → EIDO/BBCA effect)
+4. **Action points** kalau ada (watchlist, risk, opportunity)
+Tulis dengan gaya Edith — casual Jaksel, informatif, to the point tapi tidak minimalis.
+
 CONTOH SALAH (jangan pernah):
 ❌ "DTI lo aman kok, sekitar 20%" ← ngitung sendiri, HARAM
 ❌ "CC util lo kira-kira 10%" ← estimasi sendiri, HARAM
@@ -1919,6 +1926,15 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
     _tool_results_log: list = []  # collect tool results for Haiku polish context
     _user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
 
+    # Dynamic max_tokens: panjang input > 300 chars → butuh response lebih panjang
+    _input_len = len(_user_msg)
+    if _input_len > 800:
+        _max_tok = 3000   # paste berita panjang / analisis kompleks
+    elif _input_len > 300:
+        _max_tok = 2000   # query menengah
+    else:
+        _max_tok = 1500   # query pendek / tool call
+
     for iteration in range(6):  # max 6 tool-call iterations
         payload = {
             "model":       current_model,
@@ -1926,7 +1942,7 @@ def chat_with_groq(messages: list, model: str = MODEL_FINANCE, tools: list = Non
             "tools":       active_tools,
             "tool_choice": "auto",
             "temperature": 0.3,
-            "max_tokens":  1024,
+            "max_tokens":  _max_tok,
             # Groq: tidak perlu options (cloud handles context)
         }
         # Handle Ollama connection refused (service belum jalan)
