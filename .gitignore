@@ -1,11 +1,30 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+backend/*.log
+
+# Database
+backend/finance.db
+backend/finance.db-shm
+backend/finance.db-wal
+
+# Python
+backend/__pycache__/
+backend/*.pyc
+*.pyc
+
+# Node
+backend/node_modules/
+backend/package-lock.json
+package-lock.json
+
+# Secrets
 backend/.env
 backend/.env*
-backend/*.log
-backend/*.db
-backend/*.db-shm
-backend/*.db-wal
-backend/node_modules/
-backend/__pycache__/
-backend/package-lock.json
-.DS_Store
-backend/.DS_Store
+
+# Temp / generated
+ALL_CODE.txt
+ricky-finance-dashboard/
+backend/haiku_spend.json
