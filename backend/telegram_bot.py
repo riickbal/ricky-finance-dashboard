@@ -1159,6 +1159,12 @@ def exec_stage_transactions(uid: int, transactions: list) -> str:
     """Store pending transactions and return a confirmation table for the user."""
     if not transactions:
         return json.dumps({"error": "Tidak ada transaksi yang dikirim"})
+    # Sanitize: amount selalu positif, type yang tentukan In/Out
+    for t in transactions:
+        if "amount" in t:
+            t["amount"] = abs(float(t["amount"]))
+        if not t.get("type"):
+            t["type"] = "Out"  # default
     pending_confirmations[uid] = transactions
     # Build confirmation table
     lines = ["Nih transaksi yang mau dicatat, cek dulu:\n```"]
@@ -2360,15 +2366,27 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if words & _CONFIRM_YES or lower_text in _CONFIRM_YES:
             trx_list = pending_confirmations.pop(uid, [])
             results = []
+            success_count = 0
             for trx in trx_list:
                 res = exec_add_transaction(
                     trx["date"], trx["type"], trx["category"],
                     trx["account"], trx["amount"], trx.get("desc", "")
                 )
                 r = json.loads(res)
-                status = "✅" if r.get("success") else "❌"
+                if r.get("success"):
+                    status = "✅"
+                    success_count += 1
+                else:
+                    err = r.get("error") or r.get("message") or "gagal"
+                    status = f"❌ ({err})"
                 results.append(f"{status} {trx.get('desc','')} Rp{trx['amount']:,.0f} → {trx['account']}")
-            reply = "\n".join(results)
+            if success_count == len(trx_list):
+                header = f"🎯 {success_count} transaksi berhasil dicatat ke dashboard!"
+            elif success_count > 0:
+                header = f"⚠️ {success_count}/{len(trx_list)} berhasil, sisanya gagal:"
+            else:
+                header = "❌ Semua transaksi gagal dicatat. Cek detail:"
+            reply = header + "\n" + "\n".join(results)
             add_msg(uid, "assistant", reply)
             await update.message.reply_text(reply)
             return
