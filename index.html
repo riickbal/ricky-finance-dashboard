@@ -254,6 +254,8 @@ tr:hover .del-btn{opacity:1;}
 <div class="period-bar">
   <span id="lbl-pkg" style="font-size:11px;font-weight:700;color:var(--muted);margin-right:4px">Periode:</span>
   <div class="period-pill pkg-on" onclick="setPkg('all')" data-pkg="all" id="pkg-all">Semua</div>
+  <div class="period-pill" onclick="setPkg('cm')" data-pkg="cm" id="pkg-cm">This Month</div>
+  <div class="period-pill" onclick="setPkg('cy')" data-pkg="cy" id="pkg-cy">This Year</div>
   <div class="period-sep"></div>
   <div class="period-pill" onclick="setPkg('lm')" data-pkg="lm" id="pkg-lm">Last Month</div>
   <div class="period-pill" onclick="setPkg('ly')" data-pkg="ly" id="pkg-ly">Last Year</div>
@@ -978,6 +980,8 @@ function setPkg(pkg) {
     moEl.value=String(d.getMonth()+1).padStart(2,'0');
     updateDayOptions();
   }
+  else if(pkg==='cm') { yrEl.value=String(y); moEl.value=String(m+1).padStart(2,'0'); updateDayOptions(); }
+  else if(pkg==='cy') { yrEl.value=String(y); moEl.value='all'; }
   else if(pkg==='ly') { yrEl.value=String(y-1); moEl.value='all'; }
   else if(pkg==='q1') { yrEl.value=String(y); moEl.value='all'; periodOverride=`${y}-Q1`; }
   else if(pkg==='q2') { yrEl.value=String(y); moEl.value='all'; periodOverride=`${y}-Q2`; }
@@ -1130,7 +1134,7 @@ function computed() {
   const totalPL = investments.reduce((a,b)=>a+(b.pl||0),0);
 
   // Fixed Assets
-  const refDate = new Date(S.lastUpdated||new Date().toISOString().split('T')[0]);
+  const refDate = new Date(new Date().toISOString().split('T')[0]); // always today for depreciation
   const fixedAssetsComp = (S.fixedAssets||[]).map(fa=>{
     const pd = new Date(fa.purchaseDate);
     const me = (refDate.getFullYear()-pd.getFullYear())*12+(refDate.getMonth()-pd.getMonth())+1;
@@ -1354,7 +1358,7 @@ function renderIncome() {
   const inTrx = c.thisMo.filter(t=>t.type==='In').sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('income-trx-list').innerHTML = inTrx.length===0
     ? '<tr><td colspan="4" style="color:var(--muted);padding:12px">—</td></tr>'
-    : inTrx.map(t=>`<tr><td style="font-size:12px;color:var(--muted)">${t.date}</td><td style="font-size:12px;color:var(--muted)">${t.account}</td><td style="text-align:right" class="pos">+${fmtFull(t.amount)}</td><td style="font-size:12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.desc}</td></tr>`).join('');
+    : inTrx.map(t=>`<tr><td style="font-size:12px;color:var(--muted)">${t.date}</td><td style="font-size:12px;color:var(--muted)">${t.account}</td><td style="text-align:right" class="pos">+${fmtFull(t.amount)}</td><td style="font-size:12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.desc||"—"}</td></tr>`).join('');
 }
 
 // ============================================================
