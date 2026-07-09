@@ -31,3 +31,6 @@ backend/haiku_spend.json
 
 # Fuse temp files
 **/.fuse_hidden*
+
+# Local backup (data only, not for GitHub)
+backup/
